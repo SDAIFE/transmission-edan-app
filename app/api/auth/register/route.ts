@@ -4,10 +4,10 @@ import { createAuthCookie } from '@/actions/auth.action';
 import { API_URL } from '@/lib/config/api';
 import type { AuthResponseDto } from '@/types/auth';
 import { authRateLimit, getClientIdentifier } from '@/lib/config/ratelimit';
-import { loginSchema } from '@/lib/validations/auth.schema';
+import { registerSchema } from '@/lib/validations/auth.schema';
 
 /**
- * Route API pour la connexion
+ * Route API pour l'inscription
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.success) {
       return NextResponse.json(
         { 
-          error: 'Trop de tentatives de connexion. Veuillez réessayer plus tard.',
+          error: 'Trop de tentatives d\'inscription. Veuillez réessayer plus tard.',
           retryAfter: Math.round((rateLimit.reset - Date.now()) / 1000),
         },
         { 
@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validatedBody = loginSchema.parse(body);
+    const validatedBody = registerSchema.parse(body);
 
     // Appeler le backend
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Erreur de connexion' }));
+      const error = await response.json().catch(() => ({ message: 'Erreur d\'inscription' }));
       return NextResponse.json(
-        { error: error.message || 'Erreur de connexion' },
+        { error: error.message || 'Erreur d\'inscription' },
         { status: response.status }
       );
     }
@@ -82,11 +82,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const message = error instanceof Error ? error.message : 'Erreur lors de la connexion';
-    console.error('Erreur lors de la connexion:', error);
+    const message = error instanceof Error ? error.message : 'Erreur lors de l\'inscription';
+    console.error('Erreur lors de l\'inscription:', error);
     return NextResponse.json(
       { error: message },
       { status: 500 }
     );
   }
 }
+
