@@ -1,28 +1,29 @@
-"use client";
+'use client';
 
 import { useEffect } from 'react';
+import { setupAuthInterceptor } from '@/lib/services/auth.service';
 import { useAuth } from '@/contexts/AuthContext';
 
-/**
- * Composant pour intercepter les erreurs d'authentification
- * et gérer les redirections automatiques
- */
 export function AuthInterceptor() {
-  const { logout } = useAuth();
+  const { handleSessionExpired } = useAuth();
 
   useEffect(() => {
-    // Écouter les erreurs d'authentification globales
-    const handleUnauthorized = () => {
-      logout();
+    // Initialiser l'intercepteur d'authentification au montage du composant
+    setupAuthInterceptor();
+
+    // Écouter l'événement de session expirée
+    const handleSessionExpiredEvent = (event: Event) => {
+      console.log('🔄 [AuthInterceptor] Événement de session expirée reçu');
+      handleSessionExpired(event as CustomEvent);
     };
 
-    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    window.addEventListener('session-expired', handleSessionExpiredEvent);
 
     return () => {
-      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+      window.removeEventListener('session-expired', handleSessionExpiredEvent);
     };
-  }, [logout]);
+  }, [handleSessionExpired]);
 
+  // Ce composant ne rend rien, il sert juste à initialiser l'intercepteur
   return null;
 }
-

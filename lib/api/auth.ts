@@ -1,72 +1,121 @@
-import { apiClient } from './interceptor';
-import type {
-  LoginDto,
-  RegisterDto,
-  AuthResponseDto,
+import { apiClient, handleApiError } from './client';
+import type { 
+  LoginDto, 
+  RegisterDto, 
+  AuthResponseDto, 
   UserResponseDto,
+  CreateUserDto 
 } from '@/types/auth';
 
-/**
- * Client API pour l'authentification
- */
+// Service d'authentification
 export const authApi = {
-  /**
-   * Connexion
-   */
-  async login(credentials: LoginDto): Promise<AuthResponseDto> {
-    const response = await apiClient.post<AuthResponseDto>('/auth/login', credentials);
-    return response.data;
-  },
-
-  /**
-   * Inscription
-   */
-  async register(userData: RegisterDto): Promise<UserResponseDto> {
-    const response = await apiClient.post<UserResponseDto>('/auth/register', userData);
-    return response.data;
-  },
-
-  /**
-   * Déconnexion
-   */
-  async logout(): Promise<void> {
-    await apiClient.post('/auth/logout');
-  },
-
-  /**
-   * Récupère le profil utilisateur actuel
-   */
-  async getCurrentUser(): Promise<UserResponseDto> {
-    const response = await apiClient.get<UserResponseDto>('/auth/me');
-    return response.data;
-  },
-
-  /**
-   * Rafraîchit le token d'accès
-   */
-  async refreshToken(): Promise<{ accessToken: string }> {
-    const response = await apiClient.post<{ accessToken: string }>('/auth/refresh');
-    return response.data;
-  },
-
-  /**
-   * Vérifie si le token est valide
-   */
-  async verifyToken(): Promise<boolean> {
+  // Connexion
+  login: async (credentials: LoginDto): Promise<AuthResponseDto> => {
     try {
-      await apiClient.get('/auth/token');
-      return true;
+      const response = await apiClient.post('/auth/login', credentials);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // Inscription
+  register: async (userData: RegisterDto): Promise<UserResponseDto> => {
+    try {
+      const response = await apiClient.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // Refresh du token
+  // ✅ CORRECTION : Ne pas déclencher un refresh supplémentaire lors du refresh
+  refresh: async (refreshToken: string): Promise<AuthResponseDto> => {
+    try {
+      const response = await apiClient.post('/auth/refresh', { refreshToken }, {
+        // Éviter une boucle de refresh
+        headers: {
+          'X-Skip-Auth-Refresh': 'true'
+        }
+      });
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 [AuthAPI] Refresh response:', {
+          hasAccessToken: !!response.data.accessToken,
+          hasRefreshToken: !!response.data.refreshToken,
+          hasUser: !!response.data.user,
+          userKeys: response.data.user ? Object.keys(response.data.user) : 'no user',
+          fullResponse: response.data
+        });
+      }
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // Déconnexion
+  logout: async (): Promise<void> => {
+    try {
+      await apiClient.post('/auth/logout');
     } catch {
+      // On ignore les erreurs de déconnexion
+      console.warn('Erreur lors de la déconnexion');
+    }
+  },
+
+  // Profil utilisateur
+  getProfile: async (): Promise<UserResponseDto> => {
+    try {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // Vérification du token
+  // ✅ CORRECTION : Ne pas déclencher de refresh automatique lors de la vérification
+  verify: async (): Promise<boolean> => {
+    try {
+      await apiClient.get('/auth/verify', {
+        // Marquer cette requête pour éviter le refresh automatique
+        headers: {
+          'X-Skip-Auth-Refresh': 'true'
+        }
+      });
+      return true;
+    } catch (error: any) {
+      // ✅ CORRECTION : Retourner false pour les 401 au lieu de lever une exception
+      if (error?.response?.status === 401) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthAPI] Token invalide (401)');
+        }
+        return false;
+      }
       return false;
     }
   },
 
-  /**
-   * Met à jour le profil utilisateur
-   */
-  async updateProfile(updates: Partial<UserResponseDto>): Promise<UserResponseDto> {
-    const response = await apiClient.patch<UserResponseDto>('/auth/profile', updates);
-    return response.data;
+  // Création d'utilisateur (Admin/SuperAdmin)
+  createUser: async (userData: CreateUserDto): Promise<UserResponseDto> => {
+    try {
+      const response = await apiClient.post('/users', userData);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // Mise à jour du profil
+  updateProfile: async (updates: Partial<UserResponseDto>): Promise<UserResponseDto> => {
+    try {
+      const response = await apiClient.patch('/users/profile/me', updates);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
   },
 };
-

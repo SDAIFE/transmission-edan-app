@@ -1,92 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ZodError } from 'zod';
+import { authApi } from '@/lib/api/auth';
 import { createAuthCookie } from '@/actions/auth.action';
-import { API_URL } from '@/lib/config/api';
-import type { AuthResponseDto } from '@/types/auth';
-import { authRateLimit, getClientIdentifier } from '@/lib/config/ratelimit';
-import { loginSchema } from '@/lib/validations/auth.schema';
+import { loginRateLimit, getClientIdentifier, getRateLimitHeaders } from '@/lib/auth/rate-limit';
 
-/**
- * Route API pour la connexion
- */
 export async function POST(request: NextRequest) {
   try {
-    // Vérifier le rate limiting
+    // ✅ SÉCURITÉ : Vérifier le rate limit (protection force brute)
     const identifier = getClientIdentifier(request);
-    const rateLimit = await authRateLimit.limit(identifier);
-
-    if (!rateLimit.success) {
+    const { success, limit, remaining, reset } = await loginRateLimit.limit(identifier);
+    
+    if (!success) {
+      console.warn(`🚫 [Security] Rate limit dépassé pour IP: ${identifier}`);
       return NextResponse.json(
         { 
           error: 'Trop de tentatives de connexion. Veuillez réessayer plus tard.',
-          retryAfter: Math.round((rateLimit.reset - Date.now()) / 1000),
+          retryAfter: new Date(reset).toISOString(),
+          remainingAttempts: 0
         },
         { 
           status: 429,
-          headers: {
-            'Retry-After': Math.round((rateLimit.reset - Date.now()) / 1000).toString(),
-            'X-RateLimit-Limit': rateLimit.limit.toString(),
-            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-            'X-RateLimit-Reset': rateLimit.reset.toString(),
-          },
+          headers: getRateLimitHeaders(limit, 0, reset)
         }
       );
     }
-
+    
     const body = await request.json();
-    const validatedBody = loginSchema.parse(body);
+    const { email, password } = body;
 
-    // Appeler le backend
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(validatedBody),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Erreur de connexion' }));
+    if (!email || !password) {
       return NextResponse.json(
-        { error: error.message || 'Erreur de connexion' },
-        { status: response.status }
-      );
-    }
-
-    const data: AuthResponseDto = await response.json();
-
-    // Créer les cookies sécurisés
-    await createAuthCookie(
-      data.accessToken,
-      data.refreshToken,
-      data.user.role,
-      data.user.status,
-      data.user.name
-    );
-
-    // Retourner les données utilisateur (sans les tokens)
-    return NextResponse.json({
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        status: data.user.status,
-      },
-    });
-  } catch (error: unknown) {
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Données invalides', details: error.issues },
+        { error: 'Email et mot de passe requis' },
         { status: 400 }
       );
     }
 
-    const message = error instanceof Error ? error.message : 'Erreur lors de la connexion';
-    console.error('Erreur lors de la connexion:', error);
+    // Appeler l'API backend
+    const response = await authApi.login({ email, password });
+
+    if (response.accessToken && response.user) {
+      // ✅ SÉCURITÉ : Créer les cookies httpOnly sécurisés
+      await createAuthCookie(
+        response.accessToken,
+        response.refreshToken || '', // ✅ Ajouter le refresh token
+        response.user.role.code,
+        response.user.isActive ? 'active' : 'inactive',
+        `${response.user.firstName} ${response.user.lastName}`
+      );
+
+      // ✅ SÉCURITÉ : Ajouter les headers de rate limit dans la réponse réussie
+      const successResponse = NextResponse.json({
+        success: true,
+        user: response.user,
+        remainingAttempts: remaining,
+        // ✅ SÉCURITÉ : Ne plus retourner les tokens (ils sont dans les cookies httpOnly)
+        // accessToken: response.accessToken,
+      });
+      
+      // Ajouter les headers de rate limit
+      Object.entries(getRateLimitHeaders(limit, remaining, reset)).forEach(([key, value]) => {
+        successResponse.headers.set(key, value);
+      });
+      
+      return successResponse;
+    }
+
     return NextResponse.json(
-      { error: message },
+      { error: 'Réponse de connexion invalide' },
       { status: 500 }
+    );
+  } catch (error: unknown) {
+    console.error('❌ [API Login] Erreur:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+    const errorCode = (error as { code?: string })?.code;
+    const errorStatus = (error as { status?: number })?.status || 500;
+    
+    return NextResponse.json(
+      { 
+        error: errorMessage,
+        code: errorCode,
+      },
+      { status: errorStatus }
     );
   }
 }

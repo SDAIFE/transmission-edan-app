@@ -70,7 +70,7 @@ export default async function middleware(request: NextRequest) {
   // Vérification des permissions selon le rôle
   if (isLoggedIn && userRole) {
     // Routes réservées aux admins et super admins
-    const adminRoutes = ['/utilisateurs', '/rapports', '/configurations'];
+    const adminRoutes = ['/utilisateurs', '/rapports', '/configurations',  '/elections'];
     const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route));
 
     if (isAdminRoute && !['ADMIN', 'SADMIN'].includes(userRole)) {

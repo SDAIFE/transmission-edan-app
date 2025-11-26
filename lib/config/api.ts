@@ -1,14 +1,23 @@
-/**
- * Configuration de l'API backend
- */
-export const API_CONFIG = {
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-  apiVersion: '/api/v1',
-  timeout: 30000,
-} as const;
+// Configuration pour l'API
+export const config = {
+  // URL de base de l'API NEXT_PUBLIC_API_URL
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_URL || '',
+  
+  // Timeout pour les requêtes API
+  apiTimeout: 10000,
+  
+  // Cache TTL en millisecondes
+  cacheTTL: 5 * 60 * 1000, // 5 minutes
+  
+  // Mode développement - désactivé pour utiliser les données du backend
+  useMockData: false,
+};
 
-/**
- * URL complète de l'API
- */
-export const API_URL = `${API_CONFIG.baseURL}${API_CONFIG.apiVersion}`;
+// Export de l'URL API pour compatibilité
+export const API_URL = config.apiBaseUrl;
 
+// Fonction utilitaire pour vérifier si on doit utiliser les données mock
+export const shouldUseMockData = (): boolean => {
+  // Utiliser la configuration définie dans config.useMockData
+  return config.useMockData;
+};

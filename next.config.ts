@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: [],
+  // Optimisation des performances 
   poweredByHeader: false,
   generateEtags: false,
+  // Configuration des images pour la production
   images: {
     unoptimized: false,
     formats: ['image/webp', 'image/avif'],
@@ -16,10 +18,15 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
+          // Protection contre le  Clickjacking
           { key: "X-Frame-Options", value: "DENY" },
+          // Protection contre le MIME type sniffing
           { key: "X-Content-Type-Options", value: "nosniff" },
+          // Protection contre le XSS (Cross-Site Scripting)
           { key: "X-XSS-Protection", value: "1; mode=block" },
+          // Referer Policy pour la confidentialité des données
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // Content Security Policy pour la protection contre les attaques XSS
           {
             key: "Content-Security-Policy",
             value: [
@@ -48,6 +55,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Configuration pour eviter les timeouts sur les requetes longues 
   experimental: {
     proxyTimeout: 180000,
   },

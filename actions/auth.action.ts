@@ -59,6 +59,8 @@ export const deleteAuthCookie = async () => {
   cookieStore.delete("user_role");
   cookieStore.delete("user_status");
   cookieStore.delete("user_name");
+  cookieStore.delete("user");
+  
 };
 
 /**

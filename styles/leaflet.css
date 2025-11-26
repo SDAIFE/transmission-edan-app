@@ -1,0 +1,52 @@
+/* Styles pour Leaflet */
+@import 'leaflet/dist/leaflet.css';
+
+/* Personnalisation des styles Leaflet */
+.leaflet-container {
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.leaflet-popup-tip {
+  background: white;
+  border: none;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles pour les marqueurs personnalisés */
+.leaflet-interactive {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.leaflet-interactive:hover {
+  transform: scale(1.1);
+  filter: brightness(1.1);
+}
+
+/* Styles pour les contrôles */
+.leaflet-control-zoom {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-control-zoom a {
+  border-radius: 8px;
+  background-color: white;
+  color: #374151;
+  font-weight: 600;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}

@@ -1,0 +1,688 @@
+import { apiClient, uploadClient } from "./client";
+import * as XLSX from "xlsx";
+import type {
+  ImportData,
+  ImportListResponse,
+  ImportStats,
+  ImportFilters,
+  UploadRequestParams,
+  UploadResponse,
+  CelDataResponse,
+} from "@/types/upload";
+import { ImportStatus } from "@/types/upload";
+
+// Service API pour l'upload de fichiers Excel
+export const uploadApi = {
+  // ✅ NOUVEAU : Upload fichier .xlsm + CSV directement au backend
+  uploadExcel: async (params: UploadRequestParams): Promise<ImportData> => {
+    try {
+      if (process.env.NODE_ENV === "development") {
+        console.log("📤 [UploadAPI] Upload du fichier Excel (.xlsm)...");
+        console.log("📋 [UploadAPI] Paramètres:", {
+          fileName: params.file.name,
+          codeCellule: params.codeCellule,
+          fileSize: `${(params.file.size / 1024 / 1024).toFixed(2)}MB`,
+        });
+      }
+
+      // 1. ✅ Validation stricte : UNIQUEMENT .xlsm
+      if (!params.file.name.endsWith(".xlsm")) {
+        throw new Error("Seuls les fichiers .xlsm sont autorisés");
+      }
+
+      // 2. ✅ Convertir Excel (.xlsm) → CSV côté client
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "🔄 [UploadAPI] Conversion Excel (.xlsm) vers CSV côté client..."
+        );
+      }
+      const csvFile = await convertExcelToCsv(params.file);
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("✅ [UploadAPI] Conversion terminée:", {
+          original: params.file.name,
+          converted: csvFile.name,
+          originalSize: `${(params.file.size / 1024 / 1024).toFixed(2)}MB`,
+          csvSize: `${(csvFile.size / 1024).toFixed(2)}KB`,
+        });
+      }
+
+      // 3. ✅ VALIDATION : Vérifier que le code CEL dans le CSV correspond
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "🔍 [UploadAPI] Validation du code CEL dans le fichier CSV..."
+        );
+      }
+      const validation = await validateCelCodeInCsv(
+        csvFile,
+        params.codeCellule
+      );
+
+      if (!validation.isValid) {
+        console.error("❌ [UploadAPI] Validation échouée:", validation.message);
+        throw new Error(validation.message);
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("✅ [UploadAPI] Validation réussie:", validation.message);
+      }
+
+      // 4. ✅ Envoyer LES DEUX fichiers au backend NestJS
+      const formData = new FormData();
+      formData.append("excelFile", params.file); // ✅ Fichier .xlsm original
+      formData.append("csvFile", csvFile); // ✅ Fichier CSV converti
+      formData.append("codeCellule", params.codeCellule);
+
+      if (params.nomFichier) {
+        formData.append("nomFichier", params.nomFichier);
+      }
+
+      if (params.nombreBv) {
+        formData.append("nombreBv", params.nombreBv.toString());
+      }
+
+      // 5. ✅ Utiliser uploadClient (60s timeout pour fichiers volumineux)
+      const response = await uploadClient.post("/upload/excel", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+          );
+          if (process.env.NODE_ENV === "development") {
+            console.log(`📊 [UploadAPI] Progression: ${percentCompleted}%`);
+          }
+        },
+      });
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "✅ [UploadAPI] Fichiers traités avec succès par le backend:",
+          response.data.nomFichier
+        );
+      }
+
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ [UploadAPI] Erreur lors de l'upload:", error);
+
+      // Gestion détaillée des erreurs
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as {
+          response: {
+            data: { message?: string; error?: string; details?: unknown };
+            status: number;
+          };
+        };
+
+        console.error("📥 [UploadAPI] Réponse d'erreur du serveur:", {
+          status: axiosError.response.status,
+          data: axiosError.response.data,
+        });
+
+        // Créer une erreur plus informative
+        const errorMessage =
+          axiosError.response.data.message ||
+          axiosError.response.data.error ||
+          `Erreur serveur (${axiosError.response.status})`;
+
+        const uploadError = new Error(errorMessage);
+        (uploadError as any).status = axiosError.response.status;
+        (uploadError as any).details = axiosError.response.data;
+        throw uploadError;
+      }
+
+      // Erreur réseau ou autre
+      if (error instanceof Error) {
+        throw new Error(`Erreur de connexion: ${error.message}`);
+      }
+
+      throw new Error("Erreur inconnue lors de l'upload");
+    }
+  },
+
+  // Récupérer la liste des imports avec filtres
+  getImports: async (
+    filters?: ImportFilters
+  ): Promise<ImportListResponse | null> => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters?.page) queryParams.append("page", filters.page.toString());
+      if (filters?.limit) queryParams.append("limit", filters.limit.toString());
+      if (filters?.codeCellule) {
+        // Si codeCellule contient plusieurs valeurs séparées par des virgules
+        const celCodes = filters.codeCellule.split(",");
+        celCodes.forEach((code) => {
+          queryParams.append("codeCellule", code.trim());
+        });
+      }
+      if (filters?.statut) queryParams.append("statut", filters.statut);
+      // ✨ NOUVEAU : Filtres géographiques
+      if (filters?.codeRegion) queryParams.append("codeRegion", filters.codeRegion);
+      if (filters?.codeDepartement) queryParams.append("codeDepartement", filters.codeDepartement);
+
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `/upload/imports?${queryString}`
+        : "/upload/imports";
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("🌐 [UploadAPI] Requête GET imports:", {
+          url,
+          queryParams: Object.fromEntries(queryParams.entries()),
+          filters,
+          fullUrl: `/api/backend${url}`,
+        });
+      }
+
+      const response = await apiClient.get(url);
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("📥 [UploadAPI] Réponse imports:", {
+          dataLength: response.data?.imports?.length || 0,
+          total: response.data?.total || 0,
+          filters: filters,
+          responseStatus: response.status,
+          responseHeaders: response.headers,
+          firstImport: response.data?.imports?.[0] || null,
+        });
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // Si l'erreur est 403 (Forbidden), l'utilisateur n'a pas les permissions
+      if (error?.response?.status === 403 || error?.status === 403) {
+        console.warn(
+          "⚠️ [UploadAPI] Utilisateur sans permissions pour les imports",
+          {
+            status: error?.response?.status,
+            statusText: error?.response?.statusText,
+            code: error?.code,
+          }
+        );
+        return null; // Retourner null au lieu de lancer une erreur
+      }
+
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la récupération des imports:",
+        error
+      );
+      console.log("🔍 [UploadAPI] Structure de l'erreur imports:", {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        message: error?.message,
+        code: error?.code,
+      });
+      throw error; // Relancer les autres erreurs
+    }
+  },
+
+  // Récupérer les statistiques des imports
+  getStats: async (): Promise<ImportStats | null> => {
+    try {
+      const response = await apiClient.get("/upload/stats");
+      return response.data;
+    } catch (error: any) {
+      // Si l'erreur est 403 (Forbidden), l'utilisateur n'a pas les permissions
+      if (error?.response?.status === 403 || error?.status === 403) {
+        console.warn(
+          "⚠️ [UploadAPI] Utilisateur sans permissions pour les statistiques",
+          {
+            status: error?.response?.status,
+            statusText: error?.response?.statusText,
+            code: error?.code,
+          }
+        );
+        return null; // Retourner null au lieu de lancer une erreur
+      }
+
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la récupération des statistiques:",
+        error
+      );
+      console.log("🔍 [UploadAPI] Structure de l'erreur:", {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        message: error?.message,
+        code: error?.code,
+      });
+      throw error; // Relancer les autres erreurs
+    }
+  },
+
+  // Récupérer les imports d'une CEL spécifique
+  getImportsByCel: async (
+    codeCellule: string,
+    page?: number,
+    limit?: number
+  ): Promise<ImportListResponse> => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (page) queryParams.append("page", page.toString());
+      if (limit) queryParams.append("limit", limit.toString());
+
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `/upload/imports/cel/${codeCellule}?${queryString}`
+        : `/upload/imports/cel/${codeCellule}`;
+
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error: unknown) {
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la récupération des imports de la CEL:",
+        error
+      );
+      throw error;
+    }
+  },
+
+  // Récupérer les imports par statut
+  getImportsByStatus: async (
+    status: ImportStatus,
+    page?: number,
+    limit?: number
+  ): Promise<ImportListResponse> => {
+    try {
+      console.log(
+        "📋 [UploadAPI] Récupération des imports par statut:",
+        status
+      );
+
+      const queryParams = new URLSearchParams();
+      if (page) queryParams.append("page", page.toString());
+      if (limit) queryParams.append("limit", limit.toString());
+
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `/upload/imports/statut/${status}?${queryString}`
+        : `/upload/imports/statut/${status}`;
+
+      const response = await apiClient.get(url);
+
+      console.log(
+        "✅ [UploadAPI] Imports par statut récupérés:",
+        response.data.total
+      );
+      return response.data;
+    } catch (error: unknown) {
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la récupération des imports par statut:",
+        error
+      );
+      throw error;
+    }
+  },
+
+  // Récupérer un import spécifique par ID
+  getImportById: async (id: string): Promise<ImportData> => {
+    try {
+      console.log("📋 [UploadAPI] Récupération de l'import:", id);
+
+      const response = await apiClient.get(`/upload/imports/${id}`);
+
+      console.log("✅ [UploadAPI] Import récupéré:", response.data.nomFichier);
+      return response.data;
+    } catch (error: unknown) {
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la récupération de l'import:",
+        error
+      );
+      throw error;
+    }
+  },
+
+  // Supprimer un import
+  deleteImport: async (id: string): Promise<void> => {
+    try {
+      console.log("🗑️ [UploadAPI] Suppression de l'import:", id);
+
+      await apiClient.delete(`/upload/imports/${id}`);
+
+      console.log("✅ [UploadAPI] Import supprimé");
+    } catch (error: unknown) {
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la suppression de l'import:",
+        error
+      );
+      throw error;
+    }
+  },
+
+  // Télécharger un fichier d'import
+  downloadImport: async (id: string): Promise<Blob> => {
+    try {
+      console.log("⬇️ [UploadAPI] Téléchargement de l'import:", id);
+
+      const response = await apiClient.get(`/upload/imports/${id}/download`, {
+        responseType: "blob",
+      });
+
+      console.log("✅ [UploadAPI] Fichier téléchargé");
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ [UploadAPI] Erreur lors du téléchargement:", error);
+      throw error;
+    }
+  },
+
+  // Relancer le traitement d'un import en erreur
+  retryImport: async (id: string): Promise<ImportData> => {
+    try {
+      console.log("🔄 [UploadAPI] Relance du traitement de l'import:", id);
+
+      const response = await apiClient.post(`/upload/imports/${id}/retry`);
+
+      console.log("✅ [UploadAPI] Traitement relancé");
+      return response.data;
+    } catch (error: unknown) {
+      console.error(
+        "❌ [UploadAPI] Erreur lors de la relance du traitement:",
+        error
+      );
+      throw error;
+    }
+  },
+};
+
+// ✅ Fonction utilitaire : Valider que le code CEL dans le CSV correspond
+// Vérifie dans C3 ET C4 pour être flexible avec différents formats
+export const validateCelCodeInCsv = async (
+  csvFile: File,
+  expectedCelCode: string
+): Promise<{
+  isValid: boolean;
+  foundCode: string | null;
+  foundInCell: string | null;
+  message: string;
+}> => {
+  try {
+    // Lire le contenu du fichier CSV
+    const csvContent = await csvFile.text();
+
+    // Séparer les lignes
+    const lines = csvContent.split("\n");
+
+    // Vérifier qu'on a au moins 4 lignes
+    if (lines.length < 4) {
+      return {
+        isValid: false,
+        foundCode: null,
+        foundInCell: null,
+        message: "Fichier CSV invalide : moins de 4 lignes",
+      };
+    }
+
+    // ✅ Vérifier C3 (ligne 3, index 2)
+    const line3 = lines[2];
+    const columnsLine3 = line3.split(";");
+    const cellC3 = columnsLine3[2]?.trim() || "";
+
+    // ✅ Vérifier C4 (ligne 4, index 3)
+    const line4 = lines[3];
+    const columnsLine4 = line4.split(";");
+    const cellC4 = columnsLine4[2]?.trim() || "";
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 [Validation] Cellules extraites:", {
+        cellC3,
+        cellC4,
+        expectedCelCode,
+        matchC3: cellC3 === expectedCelCode,
+        matchC4: cellC4 === expectedCelCode,
+      });
+    }
+
+    // ✅ Comparer C3 avec le code attendu
+    if (cellC3 === expectedCelCode) {
+      return {
+        isValid: true,
+        foundCode: cellC3,
+        foundInCell: "C3",
+        message: `✅ Le fichier correspond bien à la CEL ${expectedCelCode} (trouvé en C3)`,
+      };
+    }
+
+    // ✅ Comparer C4 avec le code attendu
+    if (cellC4 === expectedCelCode) {
+      return {
+        isValid: true,
+        foundCode: cellC4,
+        foundInCell: "C4",
+        message: `✅ Le fichier correspond bien à la CEL ${expectedCelCode} (trouvé en C4)`,
+      };
+    }
+
+    // ❌ Aucune des deux cellules ne correspond
+    return {
+      isValid: false,
+      foundCode: cellC3 || cellC4,
+      foundInCell: null,
+      message: `❌ Le fichier ne correspond pas à la CEL sélectionnée. Trouvé en C3: "${cellC3}", C4: "${cellC4}", Attendu: "${expectedCelCode}"`,
+    };
+  } catch (error) {
+    console.error("❌ [Validation] Erreur lors de la validation:", error);
+    return {
+      isValid: false,
+      foundCode: null,
+      foundInCell: null,
+      message: "Erreur lors de la lecture du fichier CSV",
+    };
+  }
+};
+
+// ✅ Fonction utilitaire : Convertir un fichier Excel (.xlsm) en CSV
+export const convertExcelToCsv = async (file: File): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          reject(new Error("Impossible de lire le fichier"));
+          return;
+        }
+
+        // Lire le fichier Excel
+        const workbook = XLSX.read(data, { type: "binary" });
+
+        // Prendre la première feuille
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          reject(new Error("Aucune feuille trouvée dans le fichier Excel"));
+          return;
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convertir en CSV avec séparateur point-virgule
+        const csvData = XLSX.utils.sheet_to_csv(worksheet, {
+          FS: ";", // Séparateur point-virgule
+          blankrows: false, // Ignorer les lignes vides
+          skipHidden: true, // Ignorer les lignes/colonnes cachées
+        });
+
+        // Créer un nouveau fichier CSV
+        const csvBlob = new Blob([csvData], {
+          type: "text/csv;charset=utf-8;",
+        });
+
+        // Générer le nom du fichier CSV
+        const originalName = file.name.replace(/\.(xlsx|xls|xlsm)$/i, "");
+        const csvFileName = `${originalName}.csv`;
+
+        // Créer le fichier CSV
+        const csvFile = new File([csvBlob], csvFileName, {
+          type: "text/csv",
+          lastModified: Date.now(),
+        });
+
+        if (process.env.NODE_ENV === "development") {
+        console.log("✅ [UploadAPI] Fichier Excel converti en CSV:", {
+          original: file.name,
+            converted: csvFileName,
+            size: `${(csvFile.size / 1024).toFixed(2)}KB`,
+          });
+        }
+
+        resolve(csvFile);
+      } catch (error) {
+        console.error(
+          "❌ [UploadAPI] Erreur lors de la conversion Excel vers CSV:",
+          error
+        );
+        reject(
+          new Error(
+            `Erreur de conversion: ${
+              error instanceof Error ? error.message : "Erreur inconnue"
+            }`
+          )
+        );
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Erreur lors de la lecture du fichier"));
+    };
+
+    // Lire le fichier en binaire pour XLSX
+    reader.readAsBinaryString(file);
+  });
+};
+
+// ✅ Valider le type de fichier (UNIQUEMENT .xlsm)
+export const validateFileType = (
+  file: File,
+  allowedTypes: string[]
+): boolean => {
+  // Vérifier l'extension .xlsm
+  if (!file.name.endsWith(".xlsm")) {
+    return false;
+  }
+
+  // Vérifier le type MIME
+  return allowedTypes.includes(file.type);
+};
+
+// Valider la taille du fichier
+export const validateFileSize = (file: File, maxSizeMB: number): boolean => {
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+  return file.size <= maxSizeBytes;
+};
+
+// Valider le nom du fichier
+export const validateFileName = (
+  fileName: string,
+  celName: string
+): {
+  isValid: boolean;
+  message: string;
+  confidence: number;
+} => {
+  // Normaliser les noms (supprimer accents, espaces, casse)
+  const normalizeString = (str: string): string => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Supprimer accents
+      .replace(/\s+/g, "") // Supprimer espaces
+      .replace(/[^a-z0-9]/g, ""); // Garder seulement lettres et chiffres
+  };
+
+  const normalizedFileName = normalizeString(fileName);
+  const normalizedCelName = normalizeString(celName);
+
+  // Vérifier si le nom de la CEL est présent dans le nom du fichier
+  const isPresent = normalizedFileName.includes(normalizedCelName);
+
+  // Calculer le niveau de confiance
+  let confidence = 0;
+  if (isPresent) {
+    confidence = Math.min(
+      100,
+      (normalizedCelName.length / normalizedFileName.length) * 100
+    );
+  }
+
+  return {
+    isValid: isPresent,
+    message: isPresent
+      ? `✅ Nom fichier correspond à la CEL "${celName}"`
+      : `❌ Nom fichier ne correspond pas à la CEL "${celName}"`,
+    confidence: Math.round(confidence),
+  };
+};
+
+// Formater la taille du fichier
+export const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+// Obtenir l'icône du statut
+export const getStatusIcon = (status: ImportStatus): string => {
+  switch (status) {
+    case ImportStatus.N:
+      return "⏳";
+    case ImportStatus.I:
+      return "✅";
+    case ImportStatus.P:
+      return "📢";
+    default:
+      return "❓";
+  }
+};
+
+// Obtenir la couleur du statut
+export const getStatusColor = (status: ImportStatus): string => {
+  switch (status) {
+    case ImportStatus.N:
+      return "text-yellow-600";
+    case ImportStatus.I:
+      return "text-green-600";
+    case ImportStatus.P:
+      return "text-blue-600";
+    default:
+      return "text-gray-600";
+  }
+};
+
+// Fonction pour récupérer les détails d'une CEL
+export const getCelData = async (
+  codeCellule: string
+): Promise<CelDataResponse | null> => {
+  try {
+    const response = await apiClient.get(`/upload/cel/${codeCellule}/data`);
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      "❌ [UploadAPI] Erreur lors de la récupération des données CEL:",
+      error
+    );
+    console.log("🔍 [UploadAPI] Structure de l'erreur:", {
+      status: error?.response?.status,
+      statusText: error?.response?.statusText,
+      message: error?.message,
+      code: error?.code,
+    });
+
+    if (error?.response?.status === 404) {
+      throw new Error("CEL non trouvée");
+    } else if (error?.response?.status === 401) {
+      throw new Error("Token invalide");
+    } else if (error?.response?.status === 403) {
+      throw new Error("Accès non autorisé");
+    } else if (error?.response?.status === 500) {
+      throw new Error("Erreur serveur");
+    }
+
+    throw error;
+  }
+};

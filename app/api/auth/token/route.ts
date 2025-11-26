@@ -1,29 +1,40 @@
-import { NextResponse } from 'next/server';
-import { getServerToken } from '@/actions/auth.action';
-import { API_URL } from '@/lib/config/api';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerToken, getServerRefreshToken } from '@/actions/auth.action';
 
 /**
- * Route API pour vérifier la présence du token
+ * ✅ SÉCURITÉ : Route API pour récupérer les tokens côté serveur
+ * 
+ * Nécessaire car avec httpOnly=true, JavaScript côté client ne peut pas
+ * accéder directement aux cookies contenant les tokens.
+ * 
+ * Cette route permet au client de récupérer le token de manière sécurisée
+ * pour l'utiliser dans les requêtes API (header Authorization).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const token = await getServerToken();
-
-    if (!token) {
-      return NextResponse.json({ valid: false }, { status: 401 });
-    }
-
-    // Vérifier avec le backend si le token est valide
-    const response = await fetch(`${API_URL}/auth/verify`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
+    const refreshToken = await getServerRefreshToken();
+    
+    // Retourner les tokens (la communication est sécurisée via HTTPS)
+    return NextResponse.json({
+      token,
+      refreshToken,
+      hasToken: !!token,
+      hasRefreshToken: !!refreshToken
+    }, { status: 200 });
+    
+  } catch (error) {
+    console.error('❌ [API Token] Erreur:', error);
+    return NextResponse.json(
+      { 
+        token: null,
+        refreshToken: null,
+        hasToken: false,
+        hasRefreshToken: false,
+        error: 'Erreur lors de la récupération du token'
       },
-    });
-
-    return NextResponse.json({ valid: response.ok });
-  } catch (error: unknown) {
-    console.error('Erreur lors de la vérification du token:', error);
-    return NextResponse.json({ valid: false }, { status: 401 });
+      { status: 500 }
+    );
   }
 }
+

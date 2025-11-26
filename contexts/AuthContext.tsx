@@ -1,314 +1,655 @@
-"use client";
+'use client';
 
-import { createContext, useContext, ReactNode, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { UserResponseDto, LoginDto, RegisterDto, UserRole } from '@/types/auth';
-import * as authService from '@/lib/services/auth.service';
-import { isUserLoggedIn } from '@/lib/utils/auth';
+import { authService, type AuthError } from '@/lib/services/auth.service';
+// ✅ SÉCURITÉ : Plus besoin de getAuthToken, removeAuthToken (localStorage supprimé)
+import { getRedirectPath } from '@/lib/utils/auth';
+import { deleteAuthCookie } from '@/actions/auth.action';
+import type { UserResponseDto, LoginDto, RegisterDto } from '@/types/auth';
 
-/**
- * États de l'authentification
- */
-type AuthState = 'IDLE' | 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'ERROR';
-
-interface AuthContextType {
-  // État
-  state: AuthState;
+// Types pour le contexte
+interface AuthState {
   user: UserResponseDto | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
   error: string | null;
-  
-  // Actions
+  sessionExpired: boolean;
+  inactivityWarning: boolean;
+}
+
+interface AuthActions {
   login: (credentials: LoginDto) => Promise<void>;
   register: (userData: RegisterDto) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-  
-  // Utilitaires
-  isAuthenticated: boolean;
-  hasRole: (role: UserRole | UserRole[]) => boolean;
-  isLoading: boolean;
+  refreshAuth: () => Promise<boolean>;
+  clearError: () => void;
+  updateUser: (userData: Partial<UserResponseDto>) => void;
+  handleSessionExpired: (event: CustomEvent) => void;
+  showInactivityWarning: () => void;
+  hideInactivityWarning: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType extends AuthState, AuthActions {}
 
+// Interface des props du provider
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const CHECK_TOKEN_INTERVAL = 5 * 60 * 1000; // 5 minutes
+// Création du contexte
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback;
+// States d'authentification
+const AUTH_STATES = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  AUTHENTICATED: 'authenticated',
+  UNAUTHENTICATED: 'unauthenticated',
+  ERROR: 'error'
+} as const;
 
+type AuthStateType = typeof AUTH_STATES[keyof typeof AUTH_STATES];
+
+/**
+ * Provider d'authentification professionnel
+ * 
+ * Caractéristiques :
+ * - Gestion d'état centralisée avec machine d'état
+ * - Prévention des boucles infinies
+ * - Gestion robuste des erreurs
+ * - Optimisations de performance
+ * - Synchronisation entre onglets
+ */
 export function AuthProvider({ children }: AuthProviderProps) {
-  const router = useRouter();
-  const [state, setState] = useState<AuthState>('IDLE');
+  // Log pour détecter les re-renders du contexte
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔄 [AuthProvider] RENDER');
+  }
+
+  // États principaux
+  const [authState, setAuthState] = useState<AuthStateType>(AUTH_STATES.LOADING);
   const [user, setUser] = useState<UserResponseDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState<boolean>(false);
+  const [inactivityWarning, setInactivityWarning] = useState<boolean>(false);
   
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const checkTokenTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
-  const activityCleanupRef = useRef<(() => void) | null>(null);
+  // Références pour éviter les re-renders inutiles
+  const initializationRef = useRef<boolean>(false);
+  const authCheckRef = useRef<boolean>(false);
+  const router = useRouter();
+
+  // États dérivés
+  const isAuthenticated = authState === AUTH_STATES.AUTHENTICATED && !!user;
+  const isLoading = authState === AUTH_STATES.LOADING;
 
   /**
-   * Réinitialise les timers
+   * ✅ SÉCURITÉ : Initialisation sécurisée du contexte d'authentification
+   * Utilise les cookies httpOnly au lieu de localStorage
+   * ✅ CORRECTION : Timeout pour éviter le blocage indéfini
    */
-  const resetTimers = useCallback(() => {
-    // Nettoyer les anciens timers
-    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
-    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-    if (checkTokenTimerRef.current) clearInterval(checkTokenTimerRef.current);
-    if (activityCleanupRef.current) {
-      activityCleanupRef.current();
-      activityCleanupRef.current = null;
+  const initializeAuth = async () => {
+    // Éviter les initialisations multiples
+    if (initializationRef.current) return;
+    initializationRef.current = true;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔐 [AuthContext] Initialisation du contexte d\'authentification');
+    }
+    
+    // ✅ CORRECTION : Timeout de sécurité pour éviter le blocage
+    const initTimeout = setTimeout(() => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [AuthContext] Timeout d\'initialisation, passage à UNAUTHENTICATED');
+      }
+      setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      setUser(null);
+    }, 10000); // 10 secondes maximum
+    
+    try {
+      setAuthState(AUTH_STATES.LOADING);
+      
+      // ✅ SÉCURITÉ : Vérifier la présence du token via l'API (cookies httpOnly)
+      const tokenResponse = await fetch('/api/auth/token', {
+        credentials: 'include',
+        signal: AbortSignal.timeout(5000) // 5 secondes max
+      });
+      
+      if (!tokenResponse.ok || !tokenResponse) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Aucun token trouvé');
+        }
+        clearTimeout(initTimeout);
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        return;
+      }
+      
+      const { hasToken, hasRefreshToken } = await tokenResponse.json();
+      
+      if (!hasToken) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Aucun token trouvé');
+        }
+        clearTimeout(initTimeout);
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        return;
+      }
+
+      // ✅ CORRECTION : Vérifier d'abord si le token actuel est valide
+      // En cas d'erreur 401, cette méthode retourne false sans lever d'exception
+      const isValid = await authService.verifyToken();
+      if (isValid) {
+        // Token valide, récupérer les données utilisateur
+        try {
+          const userData = await authService.getCurrentUser();
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔐 [AuthContext] Utilisateur authentifié:', userData.email);
+          }
+          
+          clearTimeout(initTimeout);
+          setUser(userData);
+          setAuthState(AUTH_STATES.AUTHENTICATED);
+          return;
+        } catch (getUserError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔐 [AuthContext] Erreur lors de la récupération du profil:', getUserError);
+          }
+          // Si on ne peut pas récupérer le profil, nettoyer et déconnecter
+          clearTimeout(initTimeout);
+          await deleteAuthCookie();
+          setUser(null);
+          setError(null);
+          setAuthState(AUTH_STATES.UNAUTHENTICATED);
+          return;
+        }
+      }
+
+      // ✅ CORRECTION : Token invalide, tenter de le rafraîchir SEULEMENT s'il y a un refresh token
+      if (hasRefreshToken) {
+        try {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔐 [AuthContext] Tentative de refresh du token...');
+          }
+          const newToken = await authService.refreshToken();
+          if (newToken) {
+            // Récupérer les nouvelles données utilisateur
+            const userData = await authService.getCurrentUser();
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔐 [AuthContext] Token rafraîchi, utilisateur authentifié:', userData.email);
+            }
+            
+            clearTimeout(initTimeout);
+            setUser(userData);
+            setAuthState(AUTH_STATES.AUTHENTICATED);
+            // ✅ CORRECTION : Réinitialiser l'état de session expirée après un refresh réussi
+            setSessionExpired(false);
+            setInactivityWarning(false);
+            setError(null);
+            // ✅ CORRECTION : Marquer la reconnexion pour éviter les expirations intempestives
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('lastReconnect', Date.now().toString());
+            }
+            return;
+          }
+        } catch (refreshError: any) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔐 [AuthContext] Échec du refresh:', refreshError);
+          }
+          
+          // ✅ CORRECTION : Si le refresh échoue avec une erreur 401, nettoyer immédiatement
+          if (refreshError?.status === 401 || refreshError?.code === 'REFRESH_TOKEN_ERROR') {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔐 [AuthContext] Token expiré détecté, nettoyage...');
+            }
+            clearTimeout(initTimeout);
+            await deleteAuthCookie();
+            setUser(null);
+            setError(null); // Ne pas définir d'erreur pour éviter le blocage
+            setSessionExpired(false); // ✅ CORRECTION : Réinitialiser l'état
+            setAuthState(AUTH_STATES.UNAUTHENTICATED);
+            return;
+          }
+        }
+      }
+
+      // ✅ CORRECTION : Aucun refresh token ou échec du refresh, nettoyer et passer à UNAUTHENTICATED
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Aucun refresh token ou échec du refresh, nettoyage...');
+      }
+      clearTimeout(initTimeout);
+      await deleteAuthCookie();
+      setUser(null);
+      setError(null); // ✅ Important : ne pas définir d'erreur, juste déconnecter
+      setSessionExpired(false); // ✅ CORRECTION : Réinitialiser l'état
+      setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthContext] Erreur d\'initialisation:', error);
+      }
+      clearTimeout(initTimeout);
+      await deleteAuthCookie();
+      setUser(null);
+      setError(null); // ✅ Important : ne pas bloquer sur une erreur
+      setSessionExpired(false); // ✅ CORRECTION : Réinitialiser l'état
+      setAuthState(AUTH_STATES.UNAUTHENTICATED);
+    }
+  };
+
+  /**
+   * Connexion utilisateur
+   */
+  const login = useCallback(async (credentials: LoginDto) => {
+    try {
+      setAuthState(AUTH_STATES.LOADING);
+      setError(null);
+      // ✅ CORRECTION : Réinitialiser l'état de session expirée lors d'une nouvelle connexion
+      setSessionExpired(false);
+      setInactivityWarning(false);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Tentative de connexion...');
+      }
+      const response = await authService.login(credentials);
+      
+      if (response.user) {
+        setUser(response.user);
+        setAuthState(AUTH_STATES.AUTHENTICATED);
+        // ✅ CORRECTION : S'assurer que sessionExpired est bien à false après connexion réussie
+        setSessionExpired(false);
+        setInactivityWarning(false);
+        
+        // Redirection basée sur le rôle
+        const roleCode = typeof response.user.role === 'string' 
+          ? response.user.role 
+          : response.user.role?.code || 'USER';
+        const redirectPath = getRedirectPath(roleCode);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Connexion réussie, redirection vers:', redirectPath);
+        }
+        
+        // Redirection avec délai pour laisser l'état se stabiliser
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Exécution de la redirection vers:', redirectPath);
+        }
+        
+        // Délai court pour éviter les conflits de redirection
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 100);
+      }
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthContext] Erreur de connexion:', error);
+      }
+      setError(error.message || 'Erreur de connexion');
+      setAuthState(AUTH_STATES.ERROR);
+      throw error;
+    }
+  }, [router]);
+
+  /**
+   * Inscription utilisateur
+   */
+  const register = useCallback(async (userData: RegisterDto) => {
+    try {
+      setAuthState(AUTH_STATES.LOADING);
+      setError(null);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Tentative d\'inscription...');
+      }
+      await authService.register(userData);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Inscription réussie');
+      }
+      
+      // Rediriger vers la page de connexion
+      router.replace('/auth/login');
+      
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthContext] Erreur d\'inscription:', error);
+      }
+      setError(error.message || 'Erreur d\'inscription');
+      setAuthState(AUTH_STATES.ERROR);
+      throw error;
+    }
+  }, [router]);
+
+  /**
+   * ✅ SÉCURITÉ : Déconnexion utilisateur (supprime les cookies httpOnly)
+   */
+  const logout = useCallback(async () => {
+    try {
+      setAuthState(AUTH_STATES.LOADING);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Déconnexion...');
+      }
+      await authService.logout();
+      
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthContext] Erreur de déconnexion:', error);
+      }
+    } finally {
+      // Toujours nettoyer l'état local
+      setUser(null);
+      setError(null);
+      setSessionExpired(false); // ✅ CORRECTION : Réinitialiser l'état
+      setInactivityWarning(false);
+      setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      
+      // ✅ CORRECTION : Nettoyer le flag de reconnexion
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('lastReconnect');
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Déconnexion terminée');
+      }
+      
+      // Redirection vers la page de connexion
+      router.replace('/auth/login');
+    }
+  }, [router]);
+
+  /**
+   * ✅ SÉCURITÉ : Rafraîchissement de l'authentification (cookies httpOnly)
+   */
+  const refreshAuth = useCallback(async (): Promise<boolean> => {
+    try {
+      // ✅ SÉCURITÉ : Vérifier la présence du token via l'API
+      const tokenResponse = await fetch('/api/auth/token', {
+        credentials: 'include'
+      });
+      
+      if (!tokenResponse.ok) {
+        setUser(null);
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        return false;
+      }
+      
+      const { hasToken } = await tokenResponse.json();
+      
+      if (!hasToken) {
+        setUser(null);
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        return false;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Rafraîchissement du token...');
+      }
+      const newToken = await authService.refreshToken();
+      
+      if (newToken) {
+        // Récupérer les nouvelles données utilisateur
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+        setAuthState(AUTH_STATES.AUTHENTICATED);
+        // ✅ CORRECTION : Réinitialiser l'état de session expirée après un refresh réussi
+        setSessionExpired(false);
+        setInactivityWarning(false);
+        setError(null);
+        // ✅ CORRECTION : Marquer la reconnexion pour éviter les expirations intempestives
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('lastReconnect', Date.now().toString());
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Token rafraîchi avec succès');
+        }
+        return true;
+      }
+      
+      return false;
+      
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthContext] Erreur de refresh:', error);
+      }
+      
+      // ✅ SÉCURITÉ : En cas d'erreur, déconnecter l'utilisateur
+      setUser(null);
+      setError('Session expirée');
+      setSessionExpired(false); // ✅ CORRECTION : Réinitialiser l'état
+      await deleteAuthCookie();
+      setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      
+      return false;
     }
   }, []);
 
   /**
-   * Gère la déconnexion
+   * Effacer les erreurs
    */
-  const handleLogout = useCallback(async () => {
-    resetTimers();
-    setState('UNAUTHENTICATED');
-    setUser(null);
+  const clearError = useCallback(() => {
     setError(null);
-    
-    try {
-      await authService.logout();
-    } catch (err) {
-      console.error('Erreur lors de la déconnexion:', err);
-    } finally {
-      router.push('/auth/login');
-    }
-  }, [router, resetTimers]);
+    setAuthState(prevState => prevState === AUTH_STATES.ERROR ? AUTH_STATES.UNAUTHENTICATED : prevState);
+  }, []);
 
   /**
-   * Démarre les timers de session
+   * Mettre à jour les données utilisateur
    */
-  const startSessionTimers = useCallback(() => {
-    resetTimers();
-    lastActivityRef.current = Date.now();
-
-    // Timer de refresh automatique
-    refreshTimerRef.current = setInterval(async () => {
-      try {
-        await authService.refreshToken();
-      } catch (err) {
-        console.error('Erreur lors du refresh automatique:', err);
+  const updateUser = useCallback((userData: Partial<UserResponseDto>) => {
+    setUser(prevUser => {
+      if (prevUser && authState === AUTH_STATES.AUTHENTICATED) {
+        return { ...prevUser, ...userData };
       }
-    }, REFRESH_INTERVAL);
-
-    // Timer de vérification du token
-    checkTokenTimerRef.current = setInterval(async () => {
-      try {
-        const isValid = await authService.verifyToken();
-        if (!isValid) {
-          handleLogout();
-        }
-      } catch (err) {
-        console.error('Erreur lors de la vérification du token:', err);
-        handleLogout();
-      }
-    }, CHECK_TOKEN_INTERVAL);
-
-    // Timer d'inactivité
-    const resetInactivityTimer = () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = setTimeout(() => {
-        handleLogout();
-      }, INACTIVITY_TIMEOUT);
-    };
-
-    resetInactivityTimer();
-
-    // Écouter les événements d'activité
-    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    const handleActivity = () => {
-      lastActivityRef.current = Date.now();
-      resetInactivityTimer();
-    };
-
-    activityEvents.forEach(event => {
-      window.addEventListener(event, handleActivity);
+      return prevUser;
     });
-
-    activityCleanupRef.current = () => {
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, handleActivity);
-      });
-    };
-  }, [resetTimers, handleLogout]);
+  }, [authState]);
 
   /**
-   * Vérifie l'état d'authentification au chargement
+   * Gérer l'expiration de session
+   */
+  const handleSessionExpired = useCallback((event: CustomEvent) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔐 [AuthContext] Session expirée:', event.detail?.reason);
+    }
+    
+    // ✅ CORRECTION : Ne pas déclencher l'expiration si l'utilisateur vient juste de se connecter
+    // Vérifier si une connexion récente a eu lieu (dans les 5 dernières secondes)
+    const lastReconnect = typeof window !== 'undefined' 
+      ? sessionStorage.getItem('lastReconnect') 
+      : null;
+    
+    if (lastReconnect) {
+      const timeSinceReconnect = Date.now() - parseInt(lastReconnect, 10);
+      if (timeSinceReconnect < 5000) { // 5 secondes
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Connexion récente détectée, ignorer l\'expiration de session');
+        }
+        // Nettoyer le flag de reconnexion
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('lastReconnect');
+        }
+        return; // Ne pas déclencher l'expiration
+      }
+    }
+    
+    // ✅ CORRECTION : Vérifier que l'utilisateur est vraiment authentifié avant d'expirer
+    // Si on n'est pas authentifié, ne rien faire (évite les boucles)
+    if (authState !== AUTH_STATES.AUTHENTICATED) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Utilisateur non authentifié, ignorer l\'expiration');
+      }
+      return;
+    }
+    
+    // ✅ CORRECTION : Mettre à jour immédiatement les états pour éviter le blocage
+    setSessionExpired(true);
+    setInactivityWarning(false);
+    
+    // ✅ CORRECTION : Utiliser le message spécifique de l'erreur
+    const errorMessage = event.detail?.message || 'Session expirée par inactivité';
+    setError(errorMessage);
+    setAuthState(AUTH_STATES.ERROR);
+    
+    // ✅ CORRECTION : Ne pas déclencher automatiquement la déconnexion
+    // Laisser SessionExpiredHandler gérer la modal et la déconnexion
+    // Cela évite les déconnexions automatiques intempestives
+  }, [authState]);
+
+  /**
+   * Afficher l'avertissement d'inactivité
+   */
+  const showInactivityWarning = useCallback(() => {
+    setInactivityWarning(true);
+  }, []);
+
+  /**
+   * Masquer l'avertissement d'inactivité
+   */
+  const hideInactivityWarning = useCallback(() => {
+    setInactivityWarning(false);
+  }, []);
+
+  /**
+   * ✅ SÉCURITÉ : Gestionnaire de synchronisation entre onglets
+   * Surveille les événements personnalisés au lieu de localStorage
    */
   useEffect(() => {
-    const checkAuth = async () => {
-      setState('LOADING');
-      
-      try {
-        // Vérifier si on a des cookies indiquant une session
-        if (isUserLoggedIn()) {
-          // Essayer de récupérer l'utilisateur
-          try {
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-            setState('AUTHENTICATED');
-            startSessionTimers();
-          } catch {
-            // Token invalide ou expiré
-            setState('UNAUTHENTICATED');
-          }
-        } else {
-          setState('UNAUTHENTICATED');
+    const handleCustomLogout = () => {
+      if (isAuthenticated) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔐 [AuthContext] Déconnexion détectée dans un autre onglet');
         }
-      } catch {
-        setState('ERROR');
-        setError('Erreur lors de la vérification de l\'authentification');
+        setUser(null);
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        router.replace('/auth/login');
       }
     };
 
-    checkAuth();
-
-    // Écouter les événements de synchronisation entre onglets
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth:logout') {
-        handleLogout();
+    const handleSessionExpiredEvent = (event: CustomEvent) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 [AuthContext] Session expirée détectée:', event.detail);
       }
+      
+      // Déclencher la gestion d'expiration de session
+      handleSessionExpired(event);
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('auth:unauthorized', handleLogout);
-
+    window.addEventListener('auth-logout', handleCustomLogout);
+    window.addEventListener('auth-session-expired', handleSessionExpiredEvent as EventListener);
+    
     return () => {
-      resetTimers();
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('auth:unauthorized', handleLogout);
+      window.removeEventListener('auth-logout', handleCustomLogout);
+      window.removeEventListener('auth-session-expired', handleSessionExpiredEvent as EventListener);
     };
-  }, [handleLogout, startSessionTimers, resetTimers]);
+  }, [isAuthenticated, router, handleSessionExpired]);
 
   /**
-   * Connexion
+   * Initialisation au montage
    */
-  const login = useCallback(async (credentials: LoginDto) => {
-    setState('LOADING');
-    setError(null);
+  useEffect(() => {
+    initializeAuth();
+  }, []); // Pas de dépendances pour éviter la boucle infinie
 
-    try {
-      const { user: userData } = await authService.login(credentials);
-      setUser(userData);
-      setState('AUTHENTICATED');
-      startSessionTimers();
-      router.push('/dashboard');
-      } catch (error: unknown) {
-        const message = getErrorMessage(error, 'Erreur lors de la connexion');
-        setState('ERROR');
-        setError(message);
-        throw new Error(message);
+  // Valeur du contexte mémorisée pour éviter les re-renders
+  const contextValue: AuthContextType = useMemo(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 [AuthContext] contextValue recalculé');
     }
-  }, [router, startSessionTimers]);
-
-  /**
-   * Inscription
-   */
-  const register = useCallback(async (userData: RegisterDto) => {
-    setState('LOADING');
-    setError(null);
-
-    try {
-      await authService.register(userData);
-      // Après inscription, connecter l'utilisateur
-      await login({ email: userData.email, password: userData.password });
-    } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Erreur lors de l\'inscription');
-      setState('ERROR');
-      setError(message);
-      throw new Error(message);
-    }
-  }, [login]);
-
-  /**
-   * Déconnexion
-   */
-  const logout = useCallback(async () => {
-    // Notifier les autres onglets
-    localStorage.setItem('auth:logout', Date.now().toString());
-    await handleLogout();
-  }, [handleLogout]);
-
-  /**
-   * Rafraîchit les données utilisateur
-   */
-  const refreshUser = useCallback(async () => {
-    try {
-      const userData = await authService.getCurrentUser();
-      setUser(userData);
-    } catch (err) {
-      console.error('Erreur lors du rafraîchissement:', err);
-      await handleLogout();
-    }
-  }, [handleLogout]);
-
-  /**
-   * Vérifie si l'utilisateur a un rôle spécifique
-   */
-  const hasRole = useCallback((role: UserRole | UserRole[]): boolean => {
-    if (!user) return false;
-    const roles = Array.isArray(role) ? role : [role];
-    return roles.includes(user.role);
-  }, [user]);
-
-  // Valeurs calculées
-  const isAuthenticated = useMemo(() => state === 'AUTHENTICATED' && user !== null, [state, user]);
-  const isLoading = useMemo(() => state === 'LOADING' || state === 'IDLE', [state]);
-
-  const value = useMemo<AuthContextType>(() => ({
-    state,
+    return {
+    // État
     user,
+    isAuthenticated,
+    isLoading,
     error,
+    sessionExpired,
+    inactivityWarning,
+    
+    // Actions (toutes mémorisées avec useCallback)
     login,
     register,
     logout,
-    refreshUser,
+    refreshAuth,
+    clearError,
+    updateUser,
+    handleSessionExpired,
+    showInactivityWarning,
+    hideInactivityWarning,
+    };
+  }, [
+    // États uniquement (les fonctions sont stables grâce à useCallback)
+    user,
     isAuthenticated,
-    hasRole,
     isLoading,
-  }), [state, user, error, login, register, logout, refreshUser, isAuthenticated, hasRole, isLoading]);
+    error,
+    sessionExpired,
+    inactivityWarning,
+    // Fonctions mémorisées
+    login,
+    register,
+    logout,
+    refreshAuth,
+    clearError,
+    updateUser,
+    handleSessionExpired,
+    showInactivityWarning,
+    hideInactivityWarning,
+  ]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+/**
+ * Hook pour utiliser le contexte d'authentification
+ */
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
+  
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth doit être utilisé dans un AuthProvider');
   }
+  
   return context;
 }
 
 /**
- * Hook pour vérifier les permissions
+ * Hook pour vérifier les permissions utilisateur
  */
 export function usePermissions() {
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
+  
+  const hasRole = useCallback((role: string) => {
+    return user?.role?.code === role;
+  }, [user]);
 
-  const isAdmin = useMemo(() => hasRole(['ADMIN', 'SADMIN']), [hasRole]);
-  const isSuperAdmin = useMemo(() => hasRole('SADMIN'), [hasRole]);
-  const isUser = useMemo(() => hasRole('USER'), [hasRole]);
+  const hasAnyRole = useCallback((roles: string[]) => {
+    return user?.role?.code && roles.includes(user.role.code);
+  }, [user]);
+
+  const canAccess = useCallback((resource: string, action: string) => {
+    if (!user?.role) return false;
+    
+    const roleConfig = {
+      USER: ['read:cels', 'upload:excel'],
+      ADMIN: ['read:cels', 'read:departements', 'upload:excel', 'manage:users'],
+      SADMIN: ['*'],
+    };
+
+    const permissions = roleConfig[user.role.code as keyof typeof roleConfig];
+    
+    if (permissions?.includes('*')) return true;
+    
+    return permissions?.includes(`${action}:${resource}`) ?? false;
+  }, [user]);
 
   return {
-    isAdmin,
-    isSuperAdmin,
-    isUser,
     hasRole,
-    user,
+    hasAnyRole,
+    canAccess,
+    isUser: hasRole('USER'),
+    isAdmin: hasRole('ADMIN'),
+    isSuperAdmin: hasRole('SADMIN'),
   };
 }
