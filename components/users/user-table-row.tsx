@@ -107,17 +107,39 @@ export function UserTableRow({
       
       <TableCell>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {user.departements.length} département{user.departements.length > 1 ? 's' : ''}
-          </Badge>
+          {/* ✅ PROTECTION : Gérer les départements et circonscriptions */}
+          {user.departements && user.departements.length > 0 ? (
+            <Badge variant="outline" className="text-xs">
+              {user.departements.length} département{user.departements.length > 1 ? 's' : ''}
+            </Badge>
+          ) : user.circonscriptions && user.circonscriptions.length > 0 ? (
+            <Badge variant="outline" className="text-xs">
+              {user.circonscriptions.length} circonscription{user.circonscriptions.length > 1 ? 's' : ''}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Aucun
+            </Badge>
+          )}
         </div>
       </TableCell>
       
       <TableCell>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {user.cellules ? user.cellules.length : 0} CEL{(user.cellules ? user.cellules.length : 0) > 1 ? 's' : ''}
-          </Badge>
+          {/* ✅ PROTECTION : Gérer les cellules (nouveau format avec COD_CEL ou ancien format) */}
+          {user.cellules && user.cellules.length > 0 ? (
+            <Badge variant="outline" className="text-xs">
+              {user.cellules.length} CEL{user.cellules.length > 1 ? 's' : ''}
+            </Badge>
+          ) : user.cellulesOld && user.cellulesOld.length > 0 ? (
+            <Badge variant="outline" className="text-xs">
+              {user.cellulesOld.length} CEL{user.cellulesOld.length > 1 ? 's' : ''}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Aucune
+            </Badge>
+          )}
         </div>
       </TableCell>
       
@@ -131,19 +153,27 @@ export function UserTableRow({
       
       <TableCell>
         <div className="flex items-center gap-2">
+          {/* ✅ PROTECTION : isConnected peut être undefined */}
           <div className="flex items-center gap-1">
-            {user.isConnected ? (
+            {user.isConnected === true ? (
               <Wifi className="h-4 w-4 text-green-500" />
             ) : (
               <WifiOff className="h-4 w-4 text-gray-400" />
             )}
-            <span className={`text-sm ${user.isConnected ? 'text-green-600' : 'text-gray-500'}`}>
-              {user.isConnected ? 'Connecté' : 'Hors ligne'}
+            <span className={`text-sm ${user.isConnected === true ? 'text-green-600' : 'text-gray-500'}`}>
+              {user.isConnected === true ? 'Connecté' : 'Hors ligne'}
             </span>
           </div>
+          {/* ✅ PROTECTION : lastConnectionAt peut être undefined ou string */}
           {user.lastConnectionAt && (
             <div className="text-xs text-muted-foreground">
-              {formatLastConnection(user.lastConnectionAt)}
+              {formatLastConnection(typeof user.lastConnectionAt === 'string' ? user.lastConnectionAt : String(user.lastConnectionAt))}
+            </div>
+          )}
+          {/* ✅ AFFICHAGE : Afficher activeSession si disponible */}
+          {user.activeSession && (
+            <div className="text-xs text-muted-foreground">
+              Session active
             </div>
           )}
         </div>

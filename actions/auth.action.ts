@@ -11,6 +11,9 @@ import { cookies } from "next/headers";
  * - sameSite: "strict" (protection CSRF maximale)
  * - maxAge: 7 jours (rotation fréquente des tokens)
  */
+// 🔄 ÉTAPE 9 : STOCKAGE SÉCURISÉ DES TOKENS
+// Réception des tokens depuis authService.login()
+// Création de cookies sécurisés avec configuration de sécurité maximale
 export const createAuthCookie = async (
   token: string,
   refreshToken: string,
@@ -39,10 +42,14 @@ export const createAuthCookie = async (
   };
   
   // ✅ TOKENS SENSIBLES : Stockés avec httpOnly
+  // Création des cookies sécurisés pour les tokens d'authentification
+  // Ces cookies ne sont pas accessibles via JavaScript (protection XSS)
   cookieStore.set("access_token", token, secureCookieConfig);
   cookieStore.set("refresh_token", refreshToken, secureCookieConfig);
   
   // ✅ DONNÉES NON-SENSIBLES : Accessibles pour l'UI
+  // Création des cookies publics pour les données d'interface utilisateur
+  // Ces cookies sont accessibles côté client pour l'affichage
   cookieStore.set("user_role", role, publicCookieConfig);
   cookieStore.set("user_status", status, publicCookieConfig);
   cookieStore.set("user_name", userName || "", publicCookieConfig);

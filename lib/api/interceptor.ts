@@ -6,17 +6,40 @@ import { deleteAuthCookie } from '@/actions/auth.action';
 
 /**
  * ✅ SÉCURITÉ : Récupère le token depuis les cookies httpOnly
+ * 
+ * ✅ CORRECTION : Gestion robuste des erreurs pour ne pas bloquer les requêtes
+ * Si l'appel échoue (serveur non démarré, erreur réseau), retourne null silencieusement
  */
 async function getTokenFromCookies(): Promise<string | null> {
   try {
+    // ✅ CORRECTION : Timeout pour éviter les blocages
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 secondes max
+
     const response = await fetch('/api/auth/token', {
-      credentials: 'include'
+      credentials: 'include',
+      signal: controller.signal
     });
-    if (!response.ok) return null;
-    const { token } = await response.json();
-    return token;
-  } catch {
-    return null;
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // Si la réponse n'est pas OK, pas de token disponible (normal avant connexion)
+      return null;
+    }
+
+    const data = await response.json();
+    return data.token || null;
+  } catch (error: any) {
+    // ✅ CORRECTION : Ne pas bloquer si erreur réseau (serveur non démarré, etc.)
+    // C'est normal qu'il n'y ait pas de token avant la première connexion
+    if (process.env.NODE_ENV === 'development') {
+      // Seulement logger en dev, pas en production pour éviter le bruit
+      if (error.name !== 'AbortError') {
+        // Ne pas logger les timeouts, c'est normal
+      }
+    }
+    return null; // Retourner null silencieusement pour ne pas bloquer
   }
 }
 
@@ -41,14 +64,29 @@ export const uploadClient = axios.create({
 // ✅ SÉCURITÉ : Intercepteur pour ajouter le token depuis les cookies httpOnly
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await getTokenFromCookies();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // ✅ CORRECTION : Ne pas bloquer la requête si getTokenFromCookies échoue
+    // C'est normal qu'il n'y ait pas de token avant la première connexion
+    try {
+      const token = await getTokenFromCookies();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      // Si pas de token, la requête continue sans header Authorization
+      // Le backend retournera 401 si authentification requise
+    } catch (error) {
+      // ✅ CORRECTION : Ne pas bloquer la requête en cas d'erreur
+      // Logger uniquement en développement pour éviter le bruit
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [Interceptor] Erreur récupération token, requête continue sans token');
+      }
+      // Continuer sans token - le backend gérera l'authentification
     }
     return config;
   },
   (error) => {
-    console.error('❌ [Interceptor] Erreur dans l\'intercepteur de requête:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ [Interceptor] Erreur dans l\'intercepteur de requête:', error);
+    }
     return Promise.reject(error);
   }
 );
@@ -68,15 +106,15 @@ apiClient.interceptors.response.use(
     // ✅ SÉCURITÉ : Gestion erreur 429 (Rate Limiting)
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after'] || 60;
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [Interceptor] Rate limit atteint. Retry-After: ${retryAfter}s`);
       }
-      
+
       // Ajouter des informations pour le composant UI
       error.isRateLimited = true;
       error.retryAfter = parseInt(retryAfter, 10);
-      
+
       return Promise.reject(error);
     }
 
@@ -85,7 +123,7 @@ apiClient.interceptors.response.use(
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [Interceptor] Service temporairement indisponible (503)');
       }
-      
+
       return Promise.reject(error);
     }
 
@@ -94,21 +132,21 @@ apiClient.interceptors.response.use(
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [Interceptor] Requête timeout (ECONNABORTED)');
       }
-      
+
       error.isTimeout = true;
       return Promise.reject(error);
     }
 
     // Gestion des erreurs de connexion réseau
-    if (error.code === 'ECONNRESET' || 
-        error.code === 'NETWORK_ERROR' || 
-        error.message?.includes('aborted') ||
-        error.message?.includes('timeout') ||
-        !error.response) {
+    if (error.code === 'ECONNRESET' ||
+      error.code === 'NETWORK_ERROR' ||
+      error.message?.includes('aborted') ||
+      error.message?.includes('timeout') ||
+      !error.response) {
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [Interceptor] Erreur de connexion réseau détectée:', error.code || error.message);
       }
-      
+
       // Ne pas traiter les erreurs réseau comme des erreurs d'authentification
       // Garder l'utilisateur connecté en cas de problème réseau temporaire
       return Promise.reject(error);
@@ -116,7 +154,7 @@ apiClient.interceptors.response.use(
 
     // ✅ CORRECTION : Ne pas tenter de refresh si la requête a le flag X-Skip-Auth-Refresh
     const skipAuthRefresh = originalRequest.headers?.['X-Skip-Auth-Refresh'] === 'true';
-    
+
     // Si l'erreur est 401 (Unauthorized) et qu'on n'a pas déjà tenté de refresh
     if (error.response?.status === 401 && !originalRequest._retry && !skipAuthRefresh) {
       originalRequest._retry = true;
@@ -138,10 +176,10 @@ apiClient.interceptors.response.use(
           if (process.env.NODE_ENV === 'development') {
             console.log('🔄 [Interceptor] Token expiré, tentative de refresh...');
           }
-          
+
           refreshTokenPromise = authService.refreshToken();
           const newToken = await refreshTokenPromise;
-          
+
           if (newToken) {
             if (process.env.NODE_ENV === 'development') {
               console.log('✅ [Interceptor] Token rafraîchi avec succès');
@@ -155,41 +193,41 @@ apiClient.interceptors.response.use(
         if (process.env.NODE_ENV === 'development') {
           console.error('❌ [Interceptor] Échec du refresh du token:', refreshError);
         }
-        
+
         // ✅ SÉCURITÉ : En cas d'erreur de refresh, supprimer les cookies
         await deleteAuthCookie();
-        
+
         // ✅ CORRECTION : Déclencher l'événement de session expirée au lieu de rediriger directement
         if (typeof window !== 'undefined') {
           if (process.env.NODE_ENV === 'development') {
             console.log('🔄 [Interceptor] Déclenchement de l\'événement auth-session-expired');
           }
-          
+
           // ✅ CORRECTION : Utiliser le bon nom d'événement (auth-session-expired)
           let reason = 'token_refresh_failed';
           let message = 'Session expirée';
-          
+
           if (refreshError?.message) {
             message = refreshError.message;
           } else if (error.response?.data?.message) {
             message = error.response.data.message;
           }
-          
+
           if (message.includes('inactivité')) {
             reason = 'user_inactivity';
           } else if (message.includes('expiré')) {
             reason = 'token_expired';
           }
-          
-          window.dispatchEvent(new CustomEvent('auth-session-expired', { 
-            detail: { 
+
+          window.dispatchEvent(new CustomEvent('auth-session-expired', {
+            detail: {
               reason,
               originalError: error,
               message
-            } 
+            }
           }));
         }
-        
+
         // ✅ CORRECTION : Ne pas rejeter l'erreur, retourner une erreur claire
         const customError = new Error(refreshError?.message || 'Session expirée. Veuillez vous reconnecter.');
         (customError as any).isAuthError = true;
@@ -230,14 +268,14 @@ uploadClient.interceptors.response.use(
     // ✅ SÉCURITÉ : Gestion erreur 429 (Rate Limiting) pour uploads
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after'] || 60;
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [UploadInterceptor] Rate limit atteint. Retry-After: ${retryAfter}s`);
       }
-      
+
       error.isRateLimited = true;
       error.retryAfter = parseInt(retryAfter, 10);
-      
+
       return Promise.reject(error);
     }
 
@@ -246,7 +284,7 @@ uploadClient.interceptors.response.use(
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [UploadInterceptor] Service temporairement indisponible (503)');
       }
-      
+
       return Promise.reject(error);
     }
 
@@ -255,17 +293,17 @@ uploadClient.interceptors.response.use(
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [UploadInterceptor] Upload timeout (60s dépassé)');
       }
-      
+
       error.isTimeout = true;
       return Promise.reject(error);
     }
 
     // Gestion des erreurs de connexion réseau
-    if (error.code === 'ECONNRESET' || 
-        error.code === 'NETWORK_ERROR' || 
-        error.message?.includes('aborted') ||
-        error.message?.includes('timeout') ||
-        !error.response) {
+    if (error.code === 'ECONNRESET' ||
+      error.code === 'NETWORK_ERROR' ||
+      error.message?.includes('aborted') ||
+      error.message?.includes('timeout') ||
+      !error.response) {
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ [UploadInterceptor] Erreur de connexion réseau:', error.code || error.message);
       }
@@ -280,9 +318,9 @@ uploadClient.interceptors.response.use(
         if (process.env.NODE_ENV === 'development') {
           console.log('🔄 [UploadInterceptor] Token expiré, tentative de refresh...');
         }
-        
+
         const newToken = await authService.refreshToken();
-        
+
         if (newToken) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return uploadClient(originalRequest);
@@ -291,15 +329,15 @@ uploadClient.interceptors.response.use(
         if (process.env.NODE_ENV === 'development') {
           console.error('❌ [UploadInterceptor] Échec du refresh du token:', refreshError);
         }
-        
+
         await deleteAuthCookie();
-        
+
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('session-expired', { 
-            detail: { 
+          window.dispatchEvent(new CustomEvent('session-expired', {
+            detail: {
               reason: 'token_refresh_failed',
-              originalError: error 
-            } 
+              originalError: error
+            }
           }));
         }
       }

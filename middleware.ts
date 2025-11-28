@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isOriginAllowed } from '@/lib/config/cors';
 
+// 🔄 ÉTAPE 13 : MIDDLEWARE - VÉRIFICATION ET REDIRECTION FINALE
+// Interception de toutes les requêtes pour vérifier l'authentification
+// Gestion automatique des redirections basées sur l'état d'authentification
 export default async function middleware(request: NextRequest) {
   const { nextUrl } = request;
   const pathname = nextUrl.pathname;
@@ -9,16 +12,16 @@ export default async function middleware(request: NextRequest) {
   // ✅ Gestion CORS pour les routes API
   if (pathname.startsWith('/api/')) {
     const origin = request.headers.get('origin');
-    
+
     if (origin && !isOriginAllowed(origin)) {
-      return new NextResponse(null, { 
+      return new NextResponse(null, {
         status: 403,
         statusText: 'Origine non autorisée'
       });
     }
-    
+
     const response = NextResponse.next();
-    
+
     if (origin && isOriginAllowed(origin)) {
       response.headers.set('Access-Control-Allow-Origin', origin);
       response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -28,7 +31,7 @@ export default async function middleware(request: NextRequest) {
         'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
       );
     }
-    
+
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
         status: 200,
@@ -41,7 +44,7 @@ export default async function middleware(request: NextRequest) {
         } : {}
       });
     }
-    
+
     return response;
   }
 
@@ -49,7 +52,9 @@ export default async function middleware(request: NextRequest) {
   const publicRoutes = ['/', '/auth/login', '/auth/register'];
   const isPublicRoute = publicRoutes.includes(pathname);
 
-  // ✅ Vérification de l'authentification via cookies httpOnly
+  // 🔄 ÉTAPE 14 : VÉRIFICATION DE L'AUTHENTIFICATION
+  // Lecture des cookies créés par createAuthCookie() à l'étape 9
+  // Vérification de la présence des tokens et du rôle utilisateur
   const cookieStore = await cookies();
   const accessToken = cookieStore.get('access_token')?.value;
   const userRole = cookieStore.get('user_role')?.value;
@@ -57,20 +62,23 @@ export default async function middleware(request: NextRequest) {
 
   const isLoggedIn = !!accessToken && !!userRole;
 
-  // Redirection si connecté et accès à /auth
+  // 🔄 ÉTAPE 15 : LOGIQUE DE REDIRECTION AUTOMATIQUE
+  // Si utilisateur connecté tente d'accéder aux pages d'auth, rediriger vers dashboard
   if (isLoggedIn && pathname.startsWith('/auth')) {
     return NextResponse.redirect(new URL('/dashboard', nextUrl));
   }
 
-  // Redirection si non connecté et accès à route protégée
+  // Si utilisateur non connecté tente d'accéder à une route protégée, rediriger vers login
   if (!isLoggedIn && !isPublicRoute) {
     return NextResponse.redirect(new URL('/auth/login', nextUrl));
   }
 
-  // Vérification des permissions selon le rôle
+  // 🔄 ÉTAPE 16 : VÉRIFICATION DES PERMISSIONS ET FINALISATION
+  // Contrôle des accès basé sur les rôles et statut utilisateur
+  // Redirection finale vers la destination appropriée
   if (isLoggedIn && userRole) {
     // Routes réservées aux admins et super admins
-    const adminRoutes = ['/utilisateurs', '/rapports', '/configurations',  '/elections'];
+    const adminRoutes = ['/utilisateurs', '/rapports', '/configurations', '/elections'];
     const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route));
 
     if (isAdminRoute && !['ADMIN', 'SADMIN'].includes(userRole)) {
@@ -83,6 +91,7 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
+  // ✅ PROCESSUS TERMINÉ : Autoriser l'accès à la route demandée
   return NextResponse.next();
 }
 

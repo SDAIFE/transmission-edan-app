@@ -30,20 +30,38 @@ export interface UserResponseDto {
     name: string;
   };
   isActive: boolean;
-  isConnected: boolean;        // ✨ NOUVEAU
-  lastConnectionAt?: Date;     // ✨ NOUVEAU
-  departements: {
+  isConnected?: boolean;        // Optionnel selon la réponse
+  lastConnectionAt?: Date | string;     // Peut être string ISO ou Date
+  // ✅ ADAPTATION : Structure selon la réponse réelle du backend
+  circonscriptions?: {
+    id: number;
+    COD_CE: string;
+    LIB_CE: string;
+  }[];
+  // ✅ ADAPTATION : Ancien format pour compatibilité
+  departements?: {
     id: string;
     codeDepartement: string;
     libelleDepartement: string;
   }[];
-  cellules: {
+  // ✅ ADAPTATION : Structure selon la réponse réelle du backend
+  cellules?: {
+    COD_CEL: string;
+    LIB_CEL: string;
+  }[];
+  // ✅ ADAPTATION : Ancien format pour compatibilité
+  cellulesOld?: {
     id: string;
     codeCellule: string;
     libelleCellule: string;
   }[];
-  createdAt: Date;
-  updatedAt: Date;
+  // ✅ ADAPTATION : Session active (nouveau champ)
+  activeSession?: {
+    createdAt: string;  // ISO string
+    expiresAt: string;  // ISO string
+  };
+  createdAt: Date | string;  // Peut être string ISO ou Date
+  updatedAt: Date | string;  // Peut être string ISO ou Date
 }
 
 export interface CreateUserDto {

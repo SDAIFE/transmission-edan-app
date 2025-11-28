@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 // Types basés sur l'API documentation
+// ✅ ADAPTATION : Structure selon la réponse réelle du backend
 export interface User {
   id: string;
   email: string;
@@ -12,18 +13,37 @@ export interface User {
     name: string;
   };
   isActive: boolean;
-  isConnected: boolean;
-  lastConnectionAt: string;
-  departements: {
+  // ✅ OPTIONNEL : Ces champs peuvent ne pas être présents dans la réponse
+  isConnected?: boolean;
+  lastConnectionAt?: string;
+  // ✅ ADAPTATION : Le backend retourne circonscriptions (pas departements)
+  circonscriptions?: {
+    id: number;
+    COD_CE: string;
+    LIB_CE?: string;
+  }[];
+  // ✅ COMPATIBILITÉ : Ancien format pour compatibilité
+  departements?: {
     id: string;
     codeDepartement: string;
     libelleDepartement: string;
   }[];
-  cellules: {
+  // ✅ ADAPTATION : Le backend retourne cellules avec COD_CEL et LIB_CEL
+  cellules?: {
+    COD_CEL: string;
+    LIB_CEL?: string;
+  }[];
+  // ✅ COMPATIBILITÉ : Ancien format pour compatibilité
+  cellulesOld?: {
     id: string;
     codeCellule: string;
     libelleCellule: string;
   }[];
+  // ✅ ADAPTATION : Session active (nouveau champ)
+  activeSession?: {
+    createdAt: string;
+    expiresAt: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -76,16 +96,16 @@ export const usersApi = {
   // Créer un utilisateur
   createUser: async (userData: CreateUserData): Promise<User> => {
     try {
-      console.log('👥 [UsersAPI] Création d\'utilisateur...');
-      console.log('📤 [UsersAPI] Données envoyées:', JSON.stringify(userData, null, 2));
-      
+      console.warn('👥 [UsersAPI] Création d\'utilisateur...');
+      console.warn('📤 [UsersAPI] Données envoyées:', JSON.stringify(userData, null, 2));
+
       const response = await apiClient.post('/users', userData);
-      
-      console.log('✅ [UsersAPI] Utilisateur créé:', response.data.email);
+
+      console.warn('✅ [UsersAPI] Utilisateur créé:', response.data.email);
       return response.data;
     } catch (error: unknown) {
       console.error('❌ [UsersAPI] Erreur lors de la création:', error);
-      
+
       // Log plus détaillé de l'erreur
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as { response: { data: unknown; status: number } };
@@ -94,7 +114,7 @@ export const usersApi = {
           data: axiosError.response.data
         });
       }
-      
+
       throw error;
     }
   },
@@ -108,23 +128,87 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Récupération des utilisateurs...', params);
+        console.warn('👥 [UsersAPI] Récupération des utilisateurs...', params);
       }
-      
+
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.search) queryParams.append('search', params.search);
-      
+
       const queryString = queryParams.toString();
       const url = queryString ? `/users?${queryString}` : '/users';
-      
-      const response = await apiClient.get(url);
-      //en developpement
+
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Utilisateurs récupérés:', response.data.total);
+        console.warn('👥 [UsersAPI] URL:', url);
       }
-      return response.data;
+
+      const response = await apiClient.get(url);
+
+      // ✅ ADAPTATION : Le backend retourne { data: [...], meta: {...} }
+      // On transforme en { users: [...], total: ..., page: ..., limit: ..., totalPages: ... }
+      const backendResponse = response.data;
+
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('✅ [UsersAPI] Réponse backend reçue');
+        console.warn('✅ [UsersAPI] Structure:', {
+          hasData: !!backendResponse.data,
+          hasMeta: !!backendResponse.meta,
+          dataLength: backendResponse.data?.length || 0,
+          metaTotal: backendResponse.meta?.total || 0,
+        });
+      }
+
+      // ✅ TRANSFORMATION : Adapter la structure de réponse du backend
+      if (backendResponse.data && backendResponse.meta) {
+        // Format backend : { data: [...], meta: {...} }
+
+        // ✅ DÉDUPLICATION : Supprimer les utilisateurs en double (même ID)
+        // Le backend peut retourner des doublons, on les filtre par ID unique
+        const uniqueUsersMap = new Map<string, User>();
+        backendResponse.data.forEach((user: User) => {
+          if (user.id && !uniqueUsersMap.has(user.id)) {
+            uniqueUsersMap.set(user.id, user);
+          }
+        });
+        const uniqueUsers = Array.from(uniqueUsersMap.values());
+
+        if (process.env.NODE_ENV === 'development') {
+          const duplicatesCount = backendResponse.data.length - uniqueUsers.length;
+          if (duplicatesCount > 0) {
+            console.warn(`⚠️ [UsersAPI] ${duplicatesCount} utilisateur(s) en double détecté(s) et supprimé(s)`);
+          }
+          console.warn('✅ [UsersAPI] Utilisateurs transformés:', uniqueUsers.length);
+        }
+
+        const transformedResponse = {
+          users: uniqueUsers,
+          total: backendResponse.meta.total,
+          page: backendResponse.meta.page,
+          limit: backendResponse.meta.limit,
+          totalPages: backendResponse.meta.totalPages,
+        };
+
+        return transformedResponse;
+      }
+
+      // ✅ COMPATIBILITÉ : Si la réponse est déjà au bon format
+      if (backendResponse.users) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('✅ [UsersAPI] Format déjà correct');
+        }
+        return backendResponse;
+      }
+
+      // ✅ FALLBACK : Si aucune structure reconnue
+      console.warn('⚠️ [UsersAPI] Structure de réponse inattendue:', backendResponse);
+      return {
+        users: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      };
     } catch (error: unknown) {
       console.error('❌ [UsersAPI] Erreur lors de la récupération:', error);
       throw error;
@@ -136,13 +220,13 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Récupération de l\'utilisateur:', id);
+        console.warn('👥 [UsersAPI] Récupération de l\'utilisateur:', id);
       }
-      
+
       const response = await apiClient.get(`/users/${id}`);
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Utilisateur récupéré:', response.data.email);
+        console.warn('✅ [UsersAPI] Utilisateur récupéré:', response.data.email);
       }
       return response.data;
     } catch (error: unknown) {
@@ -156,13 +240,13 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Modification de l\'utilisateur:', id);
+        console.warn('👥 [UsersAPI] Modification de l\'utilisateur:', id);
       }
-      
+
       const response = await apiClient.patch(`/users/${id}`, userData);
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Utilisateur modifié:', response.data.email);
+        console.warn('✅ [UsersAPI] Utilisateur modifié:', response.data.email);
       }
       return response.data;
     } catch (error: unknown) {
@@ -176,13 +260,13 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Suppression de l\'utilisateur:', id);
+        console.warn('👥 [UsersAPI] Suppression de l\'utilisateur:', id);
       }
-      
+
       await apiClient.delete(`/users/${id}`);
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Utilisateur supprimé');
+        console.warn('✅ [UsersAPI] Utilisateur supprimé');
       }
     } catch (error: unknown) {
       console.error('❌ [UsersAPI] Erreur lors de la suppression:', error);
@@ -195,14 +279,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Assignation des départements:', id, data.departementCodes);
+        console.warn('👥 [UsersAPI] Assignation des départements:', id, data.departementCodes);
       }
-      
+
       const response = await apiClient.patch(`/users/${id}/departements`, data);
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Départements assignés');
+        console.warn('✅ [UsersAPI] Départements assignés');
       }
       return response.data;
     } catch (error: unknown) {
@@ -216,14 +300,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Suppression de tous les départements:', id);
+        console.warn('👥 [UsersAPI] Suppression de tous les départements:', id);
       }
-      
+
       const response = await apiClient.delete(`/users/${id}/departements`);
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Tous les départements supprimés');
+        console.warn('✅ [UsersAPI] Tous les départements supprimés');
       }
       return response.data;
     } catch (error: unknown) {
@@ -237,14 +321,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Assignation des CELs:', id, data.celCodes);
+        console.warn('👥 [UsersAPI] Assignation des CELs:', id, data.celCodes);
       }
-      
+
       const response = await apiClient.patch(`/users/${id}/cels`, data);
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] CELs assignés');
+        console.warn('✅ [UsersAPI] CELs assignés');
       }
       return response.data;
     } catch (error: unknown) {
@@ -258,14 +342,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Suppression de toutes les CELs:', id);
+        console.warn('👥 [UsersAPI] Suppression de toutes les CELs:', id);
       }
-      
+
       const response = await apiClient.delete(`/users/${id}/cels`);
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Toutes les CELs supprimées');
+        console.warn('✅ [UsersAPI] Toutes les CELs supprimées');
       }
       return response.data;
     } catch (error: unknown) {
@@ -279,14 +363,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Récupération du profil personnel...');
+        console.warn('👥 [UsersAPI] Récupération du profil personnel...');
       }
-      
+
       const response = await apiClient.get('/users/profile/me');
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Profil récupéré:', response.data.email);
+        console.warn('✅ [UsersAPI] Profil récupéré:', response.data.email);
       }
       return response.data;
     } catch (error: unknown) {
@@ -300,14 +384,14 @@ export const usersApi = {
     try {
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('👥 [UsersAPI] Modification du profil personnel...');
+        console.warn('👥 [UsersAPI] Modification du profil personnel...');
       }
-      
+
       const response = await apiClient.patch('/users/profile/me', userData);
-      
+
       //en developpement
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ [UsersAPI] Profil modifié:', response.data.email);
+        console.warn('✅ [UsersAPI] Profil modifié:', response.data.email);
       }
       return response.data;
     } catch (error: unknown) {

@@ -180,7 +180,12 @@ export function hasAnyRole(userRole: string, requiredRoles: string[]): boolean {
 /**
  * Obtient le chemin de redirection basé sur le rôle
  */
+// 🔄 ÉTAPE 10 : DÉTERMINATION DU CHEMIN DE REDIRECTION
+// Réception du rôle utilisateur depuis AuthContext.login()
+// Retour du chemin de destination basé sur les permissions du rôle
 export function getRedirectPath(role: string): string {
+  // Logique de redirection selon le rôle utilisateur
+  // Tous les rôles redirigent vers /dashboard dans cette implémentation
   switch (role) {
     case 'SADMIN':
       return '/dashboard';

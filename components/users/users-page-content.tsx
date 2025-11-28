@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { usersApi, type User, type UserListResponse } from '@/lib/api';
+import { useUsers } from '@/hooks/useUsers';
+import type { User } from '@/lib/api';
 import { UsersPageHeader } from './users-page-header';
 import { UsersStatsCards } from './users-stats-cards';
 import { UsersFilters } from './users-filters';
@@ -12,11 +12,19 @@ import { UsersModals } from './users-modals';
 
 export function UsersPageContent() {
   const { user: currentUser, isAuthenticated } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // ✅ UTILISATION DU HOOK : Utilise useUsers pour la gestion des utilisateurs
+  const {
+    users,
+    loading,
+    error,
+    meta,
+    fetchUsers,
+    clearError,
+  } = useUsers();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
 
   // États des modales
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -29,31 +37,12 @@ export function UsersPageContent() {
   // Vérifier les permissions
   const canManageUsers = currentUser?.role?.code === 'SADMIN' || currentUser?.role?.code === 'ADMIN';
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      const response: UserListResponse = await usersApi.getUsers({ 
-        page: currentPage, 
-        search: searchTerm 
-      });
-      
-      setUsers(response.users);
-      setTotalUsers(response.total);
-    } catch (error: unknown) {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement des utilisateurs';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, searchTerm]);
-
+  // ✅ UTILISATION DU HOOK : Chargement initial et recherche
   useEffect(() => {
     if (isAuthenticated && canManageUsers) {
-      fetchUsers();
+      fetchUsers(currentPage, 10, searchTerm);
     }
-  }, [isAuthenticated, canManageUsers, fetchUsers]);
+  }, [isAuthenticated, canManageUsers, currentPage, searchTerm, fetchUsers]);
 
   // Handlers pour les modales
   const handleEditUser = (user: User) => {
@@ -76,15 +65,31 @@ export function UsersPageContent() {
     setCelsModalOpen(true);
   };
 
+  // ✅ UTILISATION DU HOOK : Rafraîchir après les actions des modales
   const handleModalSuccess = () => {
-    fetchUsers();
+    fetchUsers(currentPage, 10, searchTerm);
   };
 
   return (
     <div className="space-y-6">
       <UsersPageHeader onCreateUser={() => setCreateModalOpen(true)} />
       
-      <UsersStatsCards users={users} totalUsers={totalUsers} />
+      {/* ✅ AFFICHAGE DES ERREURS : Utilise l'erreur du hook */}
+      {error && (
+        <div className="p-4 bg-red-50 text-red-600 rounded-lg border border-red-200">
+          <div className="flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={clearError}
+              className="text-red-800 hover:text-red-900 underline text-sm"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <UsersStatsCards users={users} totalUsers={meta.total} />
       
       <UsersFilters 
         searchTerm={searchTerm} 
@@ -94,7 +99,7 @@ export function UsersPageContent() {
       <UsersTable
         users={users}
         loading={loading}
-        totalUsers={totalUsers}
+        totalUsers={meta.total}
         onEdit={handleEditUser}
         onDelete={handleDeleteUser}
         onManageDepartments={handleManageDepartments}

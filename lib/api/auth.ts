@@ -1,17 +1,22 @@
 import { apiClient, handleApiError } from './client';
-import type { 
-  LoginDto, 
-  RegisterDto, 
-  AuthResponseDto, 
+import type {
+  LoginDto,
+  RegisterDto,
+  AuthResponseDto,
   UserResponseDto,
-  CreateUserDto 
+  CreateUserDto
 } from '@/types/auth';
 
 // Service d'authentification
 export const authApi = {
   // Connexion
+  // 🔄 ÉTAPE 7 : APPEL HTTP AU BACKEND
+  // Réception des identifiants depuis authService.login()
+  // Exécution de la requête POST vers l'endpoint /auth/login du serveur
   login: async (credentials: LoginDto): Promise<AuthResponseDto> => {
     try {
+      // Envoi des identifiants au serveur backend via apiClient (Axios)
+      // Le serveur valide les identifiants et retourne les tokens + données utilisateur
       const response = await apiClient.post('/auth/login', credentials);
       return response.data;
     } catch (error) {
@@ -39,9 +44,9 @@ export const authApi = {
           'X-Skip-Auth-Refresh': 'true'
         }
       });
-      
+
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 [AuthAPI] Refresh response:', {
+        console.warn('🔄 [AuthAPI] Refresh response:', {
           hasAccessToken: !!response.data.accessToken,
           hasRefreshToken: !!response.data.refreshToken,
           hasUser: !!response.data.user,
@@ -49,7 +54,7 @@ export const authApi = {
           fullResponse: response.data
         });
       }
-      
+
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -67,11 +72,32 @@ export const authApi = {
   },
 
   // Profil utilisateur
+  // ✅ ADAPTATION : Endpoint corrigé pour correspondre au backend
+  // Endpoint backend : GET /api/v1/auth/profile/me
+  // Via proxy Next.js : /api/backend/auth/profile/me → ${API_URL}/api/v1/auth/profile/me
   getProfile: async (): Promise<UserResponseDto> => {
     try {
-      const response = await apiClient.get('/auth/profile');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🔐 [AuthAPI] Récupération du profil utilisateur...');
+      }
+
+      // ✅ ADAPTATION : Utilisation de la route correcte /auth/profile/me
+      const response = await apiClient.get('/auth/profile/me');
+
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('✅ [AuthAPI] Profil utilisateur récupéré:', {
+          email: response.data.email,
+          role: response.data.role?.code,
+          hasCirconscriptions: !!response.data.circonscriptions?.length,
+          hasCellules: !!response.data.cellules?.length
+        });
+      }
+
       return response.data;
     } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [AuthAPI] Erreur récupération profil:', error);
+      }
       throw new Error(handleApiError(error));
     }
   },
@@ -87,11 +113,12 @@ export const authApi = {
         }
       });
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // ✅ CORRECTION : Retourner false pour les 401 au lieu de lever une exception
-      if (error?.response?.status === 401) {
+      const errorObj = error as { response?: { status?: number } };
+      if (errorObj?.response?.status === 401) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('🔐 [AuthAPI] Token invalide (401)');
+          console.warn('🔐 [AuthAPI] Token invalide (401)');
         }
         return false;
       }
