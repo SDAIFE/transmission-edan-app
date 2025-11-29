@@ -178,7 +178,7 @@ export const dashboardApi = {
         console.warn('🌐 [DashboardAPI] Appel GET /metrics/realtime-metrics (via proxy Next.js)');
       }
 
-      // ✅ PROXY : Utilise apiClient qui passe automatiquement par le proxy Next.js
+      // PROXY : Utilise apiClient qui passe automatiquement par le proxy Next.js
       // apiClient baseURL = '/api/backend'
       // Rewrite Next.js : '/api/backend/metrics/realtime-metrics' → '${API_URL}/api/v1/metrics/realtime-metrics'
       const response = await apiClient.get('/metrics/realtime-metrics');
