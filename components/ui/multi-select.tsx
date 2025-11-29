@@ -52,10 +52,15 @@ export function MultiSelect({
 
   const selectedOptions = options.filter((option) => selected.includes(option.value));
   
-  const filteredOptions = options.filter((option) =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    option.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = options.filter((option) => {
+    // ✅ SÉCURITÉ : Vérifier que label existe avant d'appeler toLowerCase
+    const label = option.label || '';
+    const description = option.description || '';
+    return (
+      label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <div className={cn("w-full", className)}>

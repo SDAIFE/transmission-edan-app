@@ -34,7 +34,15 @@ export function ManageUserCelsModal({ open, onOpenChange, user, onSuccess }: Man
   useEffect(() => {
     if (open && user) {
       loadCels();
-      setSelectedCels(user.cellules ? user.cellules.map(cel => cel.codeCellule) : []);
+      // ✅ ADAPTATION : Le backend utilise COD_CEL (majuscules avec underscore)
+      // ✅ COMPATIBILITÉ : Gérer aussi l'ancien format cellulesOld
+      if (user.cellules && user.cellules.length > 0) {
+        setSelectedCels(user.cellules.map(cel => cel.COD_CEL));
+      } else if (user.cellulesOld && user.cellulesOld.length > 0) {
+        setSelectedCels(user.cellulesOld.map(cel => cel.codeCellule));
+      } else {
+        setSelectedCels([]);
+      }
     }
   }, [open, user]);
 

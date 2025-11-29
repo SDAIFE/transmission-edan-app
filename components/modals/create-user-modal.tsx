@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -11,46 +11,63 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
-import { Save, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { usersApi, listsApi, rolesApi, type CreateUserData, type SimpleDepartement, type SimpleCel } from '@/lib/api';
-import type { Role, Departement, Cel } from '@/types/auth';
+} from "@/components/ui/select";
+import {
+  MultiSelect,
+  type MultiSelectOption,
+} from "@/components/ui/multi-select";
+import { Save, UserPlus, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  usersApi,
+  listsApi,
+  rolesApi,
+  type CreateUserData,
+  type SimpleCirconscription, // ✅ NOUVEAU : Utiliser SimpleCirconscription
+} from "@/lib/api";
+import type { Role } from "@/types/auth";
+// ❌ SUPPRIMÉ : Departement et Cel (remplacés par SimpleCirconscription)
 
 // Schéma de validation
-const createUserSchema = z.object({
-  email: z.string().email('Email invalide'),
-  firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
-  lastName: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
-  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
-  confirmPassword: z.string(),
-  roleId: z.string().min(1, 'Veuillez sélectionner un rôle'),
-  departementCodes: z.array(z.string()).optional(),
-  celCodes: z.array(z.string()).optional(),
-  isActive: z.boolean(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Les mots de passe ne correspondent pas',
-  path: ['confirmPassword'],
-});
+const createUserSchema = z
+  .object({
+    email: z.string().email("Email invalide"),
+    firstName: z
+      .string()
+      .min(2, "Le prénom doit contenir au moins 2 caractères"),
+    lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+    password: z
+      .string()
+      .min(8, "Le mot de passe doit contenir au moins 8 caractères"),
+    confirmPassword: z.string(),
+    roleId: z.string().min(1, "Veuillez sélectionner un rôle"),
+    circonscriptionCodes: z.array(z.string()).optional(), // ✅ NOUVEAU : Utiliser circonscriptionCodes
+    isActive: z.boolean(),
+    // ❌ SUPPRIMÉ : celCodes (calculé automatiquement par le backend)
+    // ❌ SUPPRIMÉ : departementCodes (remplacé par circonscriptionCodes)
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Les mots de passe ne correspondent pas",
+    path: ["confirmPassword"],
+  });
 
 type CreateUserFormData = z.infer<typeof createUserSchema>;
 
 // Rôles par défaut (fallback si l'API échoue)
 const defaultRoles: Role[] = [
-  { id: '1', code: 'SADMIN', name: 'Super Administrateur' },
-  { id: '2', code: 'ADMIN', name: 'Administrateur' },
-  { id: '3', code: 'USER', name: 'Utilisateur' },
+  { id: "1", code: "SADMIN", name: "Super Administrateur" },
+  { id: "2", code: "ADMIN", name: "Administrateur" },
+  { id: "3", code: "USER", name: "Utilisateur" },
 ];
 
 interface CreateUserModalProps {
@@ -59,12 +76,20 @@ interface CreateUserModalProps {
   onSuccess?: () => void;
 }
 
-export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserModalProps) {
+export function CreateUserModal({
+  open,
+  onOpenChange,
+  onSuccess,
+}: CreateUserModalProps) {
   const [loading, setLoading] = useState(false);
-  const [departements, setDepartements] = useState<Departement[]>([]);
-  const [cels, setCels] = useState<Cel[]>([]);
+  const [circonscriptions, setCirconscriptions] = useState<
+    SimpleCirconscription[]
+  >([]); // ✅ NOUVEAU : Utiliser SimpleCirconscription
   const [roles, setRoles] = useState<Role[]>(defaultRoles);
   const [listsLoading, setListsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // ❌ SUPPRIMÉ : departements et cels (remplacés par circonscriptions)
 
   const {
     register,
@@ -77,30 +102,25 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
     resolver: zodResolver(createUserSchema),
     defaultValues: {
       isActive: true,
-      departementCodes: [],
+      circonscriptionCodes: [], // ✅ NOUVEAU : Utiliser circonscriptionCodes
     },
   });
 
-  const selectedDepartements = watch('departementCodes') || [];
-  const selectedCels = watch('celCodes') || [];
+  const selectedCirconscriptions = watch("circonscriptionCodes") || []; // ✅ NOUVEAU
 
-  // Convertir les données en options pour MultiSelect
-  const departementOptions: MultiSelectOption[] = departements.map(dept => ({
-    value: dept.codeDepartement,
-    label: dept.libelleDepartement,
-    description: dept.codeDepartement,
-  }));
-
-  const celOptions: MultiSelectOption[] = cels.map(cel => ({
-    value: cel.codeCellule,
-    label: cel.libelleCellule,
-    description: cel.codeCellule,
-  }));
+  // ✅ NOUVEAU : Convertir les circonscriptions en options pour MultiSelect
+  const circonscriptionOptions: MultiSelectOption[] = circonscriptions.map(
+    (circ) => ({
+      value: circ.codCe,
+      label: circ.libCe,
+      description: circ.codCe,
+    })
+  );
 
   const onSubmit = async (formData: CreateUserFormData) => {
     try {
       setLoading(true);
-      
+
       // Préparer les données pour l'API
       const userData: CreateUserData = {
         email: formData.email,
@@ -108,25 +128,37 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
         lastName: formData.lastName,
         password: formData.password,
         roleId: formData.roleId,
-        departementCodes: formData.departementCodes || [],
-        celCodes: formData.celCodes || [],
+        circonscriptionCodes: formData.circonscriptionCodes || [], // ✅ NOUVEAU : Utiliser circonscriptionCodes
         isActive: formData.isActive,
+        // ❌ SUPPRIMÉ : celCodes (calculé automatiquement par le backend)
       };
-      
-      console.log('📋 [CreateUserModal] Données du formulaire:', formData);
-      console.log('📤 [CreateUserModal] Données préparées pour l\'API:', userData);
-      
-      const createdUser = await usersApi.createUser(userData);
-      
-      console.log('✅ [CreateUserModal] Utilisateur créé avec succès, CELs incluses dans la création');
-      
-      toast.success('Utilisateur créé avec succès');
+
+      if (process.env.NODE_ENV === "development") {
+        console.warn("📋 [CreateUserModal] Données du formulaire:", formData);
+        console.warn(
+          "📤 [CreateUserModal] Données préparées pour l'API:",
+          userData
+        );
+      }
+
+      await usersApi.createUser(userData);
+
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "✅ [CreateUserModal] Utilisateur créé avec succès, CELs incluses dans la création"
+        );
+      }
+
+      toast.success("Utilisateur créé avec succès");
       reset();
       onOpenChange(false);
       onSuccess?.();
     } catch (error: unknown) {
-      console.error('Erreur lors de la création:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erreur lors de la création de l\'utilisateur';
+      console.error("Erreur lors de la création:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la création de l'utilisateur";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -143,33 +175,31 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
   const loadLists = async () => {
     try {
       setListsLoading(true);
-      
-      // Charger les rôles, départements et CELs en parallèle
-      const [rolesList, { departements: deptList, cels: celsList }] = await Promise.all([
+
+      // ✅ NOUVEAU : Charger les rôles et circonscriptions en parallèle
+      const [rolesList, { circonscriptions: circList }] = await Promise.all([
         rolesApi.getRolesSimple().catch(() => {
-          console.warn('⚠️ [CreateUserModal] Impossible de charger les rôles, utilisation des rôles par défaut');
+          console.warn(
+            "⚠️ [CreateUserModal] Impossible de charger les rôles, utilisation des rôles par défaut"
+          );
           return defaultRoles;
         }),
-        listsApi.getFormLists()
+        listsApi.getFormLists(),
       ]);
-      
+
       setRoles(rolesList);
-      setDepartements(deptList);
-      setCels(celsList);
+      setCirconscriptions(circList); // ✅ NOUVEAU : Charger les circonscriptions
     } catch (error: unknown) {
-      console.error('Erreur lors du chargement des listes:', error);
-      toast.error('Erreur lors du chargement des listes');
+      console.error("Erreur lors du chargement des listes:", error);
+      toast.error("Erreur lors du chargement des listes");
     } finally {
       setListsLoading(false);
     }
   };
 
-  const handleDepartementChange = (selected: string[]) => {
-    setValue('departementCodes', selected);
-  };
-
-  const handleCelChange = (selected: string[]) => {
-    setValue('celCodes', selected);
+  // ✅ NOUVEAU : Handler pour les circonscriptions
+  const handleCirconscriptionChange = (selected: string[]) => {
+    setValue("circonscriptionCodes", selected);
   };
 
   const handleClose = () => {
@@ -186,7 +216,8 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             Nouvel utilisateur
           </DialogTitle>
           <DialogDescription>
-            Créer un nouveau compte utilisateur avec ses permissions et départements assignés.
+            Créer un nouveau compte utilisateur avec ses permissions et
+            départements assignés.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,23 +230,27 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                 <Label htmlFor="firstName">Prénom *</Label>
                 <Input
                   id="firstName"
-                  {...register('firstName')}
+                  {...register("firstName")}
                   placeholder="Prénom"
                 />
                 {errors.firstName && (
-                  <p className="text-sm text-red-600">{errors.firstName.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.firstName.message}
+                  </p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="lastName">Nom *</Label>
                 <Input
                   id="lastName"
-                  {...register('lastName')}
+                  {...register("lastName")}
                   placeholder="Nom"
                 />
                 {errors.lastName && (
-                  <p className="text-sm text-red-600">{errors.lastName.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.lastName.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -225,7 +260,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
               <Input
                 id="email"
                 type="email"
-                {...register('email')}
+                {...register("email")}
                 placeholder="email@exemple.com"
               />
               {errors.email && (
@@ -240,27 +275,71 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  {...register('password')}
-                  placeholder="Mot de passe"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                    placeholder="Mot de passe"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    aria-label={
+                      showPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 {errors.password && (
-                  <p className="text-sm text-red-600">{errors.password.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  {...register('confirmPassword')}
-                  placeholder="Confirmer le mot de passe"
-                />
+                <Label htmlFor="confirmPassword">
+                  Confirmer le mot de passe *
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    {...register("confirmPassword")}
+                    placeholder="Confirmer le mot de passe"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    aria-label={
+                      showConfirmPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 {errors.confirmPassword && (
-                  <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.confirmPassword.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -272,7 +351,9 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="roleId">Rôle *</Label>
-                <Select onValueChange={(value: string) => setValue('roleId', value)}>
+                <Select
+                  onValueChange={(value: string) => setValue("roleId", value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner un rôle" />
                   </SelectTrigger>
@@ -285,17 +366,19 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   </SelectContent>
                 </Select>
                 {errors.roleId && (
-                  <p className="text-sm text-red-600">{errors.roleId.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.roleId.message}
+                  </p>
                 )}
               </div>
 
               <div className="flex items-center space-x-2 pt-6">
                 <input
                   title="Compte actif"
-                  type="checkbox" 
+                  type="checkbox"
                   id="isActive"
-                  checked={watch('isActive')}
-                  onChange={(e) => setValue('isActive', e.target.checked)}
+                  checked={watch("isActive")}
+                  onChange={(e) => setValue("isActive", e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300"
                 />
                 <Label htmlFor="isActive">Compte actif</Label>
@@ -303,45 +386,34 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             </div>
           </div>
 
-          {/* Départements assignés */}
+          {/* ✅ NOUVEAU : Circonscriptions assignées */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Départements assignés</h3>
+            <div>
+              <h3 className="text-lg font-medium">
+                Circonscriptions assignées
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Les CELs seront automatiquement calculées par le système en
+                fonction des circonscriptions sélectionnées.
+              </p>
+            </div>
             {listsLoading ? (
               <div className="flex items-center justify-center py-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               </div>
             ) : (
               <MultiSelect
-                options={departementOptions}
-                selected={selectedDepartements}
-                onChange={handleDepartementChange}
-                placeholder="Sélectionner des départements..."
-                searchPlaceholder="Rechercher un département..."
-                emptyText="Aucun département trouvé."
+                options={circonscriptionOptions}
+                selected={selectedCirconscriptions}
+                onChange={handleCirconscriptionChange}
+                placeholder="Sélectionner des circonscriptions..."
+                searchPlaceholder="Rechercher une circonscription..."
+                emptyText="Aucune circonscription trouvée."
                 maxDisplay={2}
               />
             )}
           </div>
-
-          {/* CELs assignées */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">CELs assignées</h3>
-            {listsLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <MultiSelect
-                options={celOptions}
-                selected={selectedCels}
-                onChange={handleCelChange}
-                placeholder="Sélectionner des CELs..."
-                searchPlaceholder="Rechercher une CEL..."
-                emptyText="Aucune CEL trouvée."
-                maxDisplay={2}
-              />
-            )}
-          </div>
+          {/* ❌ SUPPRIMÉ : Section CELs (calculées automatiquement) */}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
@@ -353,7 +425,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              {loading ? 'Création...' : 'Créer l\'utilisateur'}
+              {loading ? "Création..." : "Créer l'utilisateur"}
             </Button>
           </DialogFooter>
         </form>

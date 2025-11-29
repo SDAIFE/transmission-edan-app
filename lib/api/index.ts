@@ -26,11 +26,11 @@ export { dashboardApi } from './dashboard';
 
 // Services API pour les utilisateurs
 export { usersApi } from './users';
-export type { User, UserListResponse, CreateUserData, UpdateUserData, UpdateProfileData, AssignDepartmentsData, AssignCelsData } from './users';
+export type { User, UserListResponse, CreateUserData, UpdateUserData, UpdateProfileData, AssignDepartmentsData, AssignCelsData, AssignCirconscriptionsData } from './users';
 
 // Services API pour les listes de formulaires
 export { listsApi } from './lists';
-export type { SimpleDepartement, SimpleCel } from './lists';
+export type { SimpleDepartement, SimpleCel, SimpleCirconscription, SimpleRegion } from './lists';
 
 // Services API pour les rôles
 export { rolesApi } from './roles';

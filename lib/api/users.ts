@@ -62,9 +62,10 @@ export interface CreateUserData {
   lastName: string;
   password: string;
   roleId: string;
-  departementCodes?: string[];
-  celCodes?: string[];
+  circonscriptionCodes?: string[]; // ✅ NOUVEAU : Utiliser circonscriptionCodes au lieu de departementCodes
   isActive?: boolean;
+  // ❌ SUPPRIMÉ : celCodes (calculé automatiquement par le backend)
+  // ❌ SUPPRIMÉ : departementCodes (remplacé par circonscriptionCodes)
 }
 
 export interface UpdateUserData {
@@ -72,9 +73,10 @@ export interface UpdateUserData {
   lastName?: string;
   email?: string;
   roleId?: string;
-  departementCodes?: string[];
-  celCodes?: string[];
   isActive?: boolean;
+  // ❌ SUPPRIMÉ : circonscriptionCodes (utiliser endpoint séparé)
+  // ❌ SUPPRIMÉ : celCodes (calculé automatiquement)
+  // ❌ SUPPRIMÉ : departementCodes (remplacé par circonscriptionCodes)
 }
 
 export interface UpdateProfileData {
@@ -89,6 +91,11 @@ export interface AssignDepartmentsData {
 
 export interface AssignCelsData {
   celCodes: string[];
+}
+
+// ✅ NOUVEAU : Interface pour assigner les circonscriptions
+export interface AssignCirconscriptionsData {
+  circonscriptionCodes: string[];
 }
 
 // Service API pour les utilisateurs
@@ -243,7 +250,7 @@ export const usersApi = {
         console.warn('👥 [UsersAPI] Modification de l\'utilisateur:', id);
       }
 
-      const response = await apiClient.patch(`/users/${id}`, userData);
+      const response = await apiClient.put(`/users/${id}`, userData);
       //en developpement
       if (process.env.NODE_ENV === 'development') {
         console.warn('✅ [UsersAPI] Utilisateur modifié:', response.data.email);
@@ -354,6 +361,26 @@ export const usersApi = {
       return response.data;
     } catch (error: unknown) {
       console.error('❌ [UsersAPI] Erreur lors de la suppression des CELs:', error);
+      throw error;
+    }
+  },
+
+  // ✅ NOUVEAU : Assigner des circonscriptions à un utilisateur
+  // Les CELs seront automatiquement recalculées par le backend
+  assignCirconscriptions: async (id: string, data: AssignCirconscriptionsData): Promise<User> => {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('👥 [UsersAPI] Assignation des circonscriptions:', id, data.circonscriptionCodes);
+      }
+
+      const response = await apiClient.post(`/users/${id}/circonscriptions`, data);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('✅ [UsersAPI] Circonscriptions assignées. Les CELs seront automatiquement recalculées.');
+      }
+      return response.data;
+    } catch (error: unknown) {
+      console.error('❌ [UsersAPI] Erreur lors de l\'assignation des circonscriptions:', error);
       throw error;
     }
   },

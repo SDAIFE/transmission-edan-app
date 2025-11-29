@@ -22,6 +22,7 @@ interface UseUsersReturn {
   deleteUser: (userId: string) => Promise<void>;
   assignDepartments: (userId: string, departementCodes: string[]) => Promise<User>;
   assignCels: (userId: string, celCodes: string[]) => Promise<User>;
+  assignCirconscriptions: (userId: string, circonscriptionCodes: string[]) => Promise<User>; // ✅ NOUVEAU
   removeAllDepartments: (userId: string) => Promise<User>;
   removeAllCels: (userId: string) => Promise<User>;
   clearError: () => void;
@@ -54,7 +55,7 @@ export function useUsers(): UseUsersReturn {
   const fetchUsers = useCallback(async (page = 1, limit = 10, search = '') => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await usersApi.getUsers({ page, limit, search });
       setUsers(response.users);
@@ -79,7 +80,7 @@ export function useUsers(): UseUsersReturn {
   const createUser = useCallback(async (userData: CreateUserData): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const newUser = await usersApi.createUser(userData);
       // Rafraîchir la liste
@@ -98,7 +99,7 @@ export function useUsers(): UseUsersReturn {
   const updateUser = useCallback(async (userId: string, updateData: UpdateUserData): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const updatedUser = await usersApi.updateUser(userId, updateData);
       // Rafraîchir la liste
@@ -117,7 +118,7 @@ export function useUsers(): UseUsersReturn {
   const deleteUser = useCallback(async (userId: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       await usersApi.deleteUser(userId);
       // Rafraîchir la liste
@@ -135,7 +136,7 @@ export function useUsers(): UseUsersReturn {
   const assignDepartments = useCallback(async (userId: string, departementCodes: string[]): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const user = await usersApi.assignDepartments(userId, { departementCodes });
       // Rafraîchir la liste
@@ -154,7 +155,7 @@ export function useUsers(): UseUsersReturn {
   const assignCels = useCallback(async (userId: string, celCodes: string[]): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const user = await usersApi.assignCels(userId, { celCodes });
       // Rafraîchir la liste
@@ -173,7 +174,7 @@ export function useUsers(): UseUsersReturn {
   const removeAllDepartments = useCallback(async (userId: string): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const user = await usersApi.removeAllDepartments(userId);
       // Rafraîchir la liste
@@ -192,9 +193,29 @@ export function useUsers(): UseUsersReturn {
   const removeAllCels = useCallback(async (userId: string): Promise<User> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const user = await usersApi.removeAllCels(userId);
+      // Rafraîchir la liste
+      await fetchUsers(meta.page, meta.limit);
+      return user;
+    } catch (err: unknown) {
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [meta.page, meta.limit, fetchUsers]);
+
+  // ✅ NOUVEAU : Assignation de circonscriptions
+  // Les CELs seront automatiquement recalculées par le backend
+  const assignCirconscriptions = useCallback(async (userId: string, circonscriptionCodes: string[]): Promise<User> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const user = await usersApi.assignCirconscriptions(userId, { circonscriptionCodes });
       // Rafraîchir la liste
       await fetchUsers(meta.page, meta.limit);
       return user;
@@ -223,6 +244,7 @@ export function useUsers(): UseUsersReturn {
     deleteUser,
     assignDepartments,
     assignCels,
+    assignCirconscriptions, // ✅ NOUVEAU
     removeAllDepartments,
     removeAllCels,
     clearError,

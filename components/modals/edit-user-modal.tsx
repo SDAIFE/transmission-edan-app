@@ -19,23 +19,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
+// ❌ SUPPRIMÉ : MultiSelect (plus utilisé dans ce modal)
 import { Save, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { usersApi, listsApi, rolesApi, type UpdateUserData, type SimpleDepartement, type SimpleCel } from '@/lib/api';
-import type { Role, Departement, Cel } from '@/types/auth';
+import { usersApi, rolesApi, type UpdateUserData, type User } from '@/lib/api';
+import type { Role } from '@/types/auth';
+// ❌ SUPPRIMÉ : SimpleDepartement, SimpleCel, Departement, Cel (gestion via endpoint séparé)
 
 // Schéma de validation
+// ❌ SUPPRIMÉ : departementCodes et celCodes (gérés via endpoint séparé)
 const editUserSchema = z.object({
   email: z.string().email('Email invalide'),
   firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
   lastName: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
   roleId: z.string().min(1, 'Veuillez sélectionner un rôle'),
-  departementCodes: z.array(z.string()).optional(),
-  celCodes: z.array(z.string()).optional(),
   isActive: z.boolean(),
 });
 
@@ -48,28 +48,7 @@ const defaultRoles: Role[] = [
   { id: '3', code: 'USER', name: 'Utilisateur' },
 ];
 
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: {
-    id: string;
-    code: string;
-    name: string;
-  };
-  isActive: boolean;
-  departements: {
-    id: string;
-    codeDepartement: string;
-    libelleDepartement: string;
-  }[];
-  cellules: {
-    id: string;
-    codeCellule: string;
-    libelleCellule: string;
-  }[];
-}
+// ✅ Utilise le type User importé de @/lib/api
 
 interface EditUserModalProps {
   open: boolean;
@@ -80,10 +59,9 @@ interface EditUserModalProps {
 
 export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserModalProps) {
   const [loading, setLoading] = useState(false);
-  const [departements, setDepartements] = useState<Departement[]>([]);
-  const [cels, setCels] = useState<Cel[]>([]);
   const [roles, setRoles] = useState<Role[]>(defaultRoles);
   const [listsLoading, setListsLoading] = useState(false);
+  // ❌ SUPPRIMÉ : departements et cels (gérés via endpoint séparé)
 
   const {
     register,
@@ -96,25 +74,8 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
     resolver: zodResolver(editUserSchema),
     defaultValues: {
       isActive: true,
-      departementCodes: [],
     },
   });
-
-  const selectedDepartements = watch('departementCodes') || [];
-  const selectedCels = watch('celCodes') || [];
-
-  // Convertir les données en options pour MultiSelect
-  const departementOptions: MultiSelectOption[] = departements.map(dept => ({
-    value: dept.codeDepartement,
-    label: dept.libelleDepartement,
-    description: dept.codeDepartement,
-  }));
-
-  const celOptions: MultiSelectOption[] = cels.map(cel => ({
-    value: cel.codeCellule,
-    label: cel.libelleCellule,
-    description: cel.codeCellule,
-  }));
 
   // Charger les données de l'utilisateur quand la modale s'ouvre
   useEffect(() => {
@@ -124,8 +85,7 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
       setValue('lastName', user.lastName);
       setValue('roleId', user.role.id);
       setValue('isActive', user.isActive);
-      setValue('departementCodes', user.departements.map(d => d.codeDepartement));
-      setValue('celCodes', user.cellules ? user.cellules.map(c => c.codeCellule) : []);
+      // ❌ SUPPRIMÉ : departementCodes et celCodes (gérés via endpoint séparé)
     }
   }, [user, open, setValue]);
 
@@ -136,13 +96,12 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
       setLoading(true);
       
       // Préparer les données pour l'API
+      // ❌ SUPPRIMÉ : departementCodes et celCodes (gérés via endpoint séparé)
       const userData: UpdateUserData = {
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         roleId: formData.roleId,
-        departementCodes: formData.departementCodes,
-        celCodes: formData.celCodes,
         isActive: formData.isActive,
       };
       
@@ -171,32 +130,19 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
     try {
       setListsLoading(true);
       
-      // Charger les rôles, départements et CELs en parallèle
-      const [rolesList, { departements: deptList, cels: celsList }] = await Promise.all([
-        rolesApi.getRolesSimple().catch(() => {
-          console.warn('⚠️ [EditUserModal] Impossible de charger les rôles, utilisation des rôles par défaut');
-          return defaultRoles;
-        }),
-        listsApi.getFormLists()
-      ]);
+      // ✅ Charger uniquement les rôles (départements et CELs gérés via endpoint séparé)
+      const rolesList = await rolesApi.getRolesSimple().catch(() => {
+        console.warn('⚠️ [EditUserModal] Impossible de charger les rôles, utilisation des rôles par défaut');
+        return defaultRoles;
+      });
       
       setRoles(rolesList);
-      setDepartements(deptList);
-      setCels(celsList);
     } catch (error: unknown) {
-      console.error('Erreur lors du chargement des listes:', error);
-      toast.error('Erreur lors du chargement des listes');
+      console.error('Erreur lors du chargement des rôles:', error);
+      toast.error('Erreur lors du chargement des rôles');
     } finally {
       setListsLoading(false);
     }
-  };
-
-  const handleDepartementChange = (selected: string[]) => {
-    setValue('departementCodes', selected);
-  };
-
-  const handleCelChange = (selected: string[]) => {
-    setValue('celCodes', selected);
   };
 
   const handleClose = () => {
@@ -303,44 +249,13 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
             </div>
           </div>
 
-          {/* Départements assignés */}
+          {/* ❌ SUPPRIMÉ : Sections départements et CELs (gérées via endpoint séparé) */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Départements assignés</h3>
-            {listsLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <MultiSelect
-                options={departementOptions}
-                selected={selectedDepartements}
-                onChange={handleDepartementChange}
-                placeholder="Sélectionner des départements..."
-                searchPlaceholder="Rechercher un département..."
-                emptyText="Aucun département trouvé."
-                maxDisplay={2}
-              />
-            )}
-          </div>
-
-          {/* CELs assignées */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">CELs assignées</h3>
-            {listsLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <MultiSelect
-                options={celOptions}
-                selected={selectedCels}
-                onChange={handleCelChange}
-                placeholder="Sélectionner des CELs..."
-                searchPlaceholder="Rechercher une CEL..."
-                emptyText="Aucune CEL trouvée."
-                maxDisplay={2}
-              />
-            )}
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Note :</strong> Les circonscriptions et CELs sont gérées séparément via le menu d'actions de l'utilisateur.
+              </p>
+            </div>
           </div>
 
           <DialogFooter>

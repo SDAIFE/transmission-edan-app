@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Save, MapPin, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { usersApi, type AssignDepartmentsData } from '@/lib/api';
+import { usersApi, type AssignDepartmentsData, type User } from '@/lib/api';
 
 // Départements disponibles (mockés)
 const departements = [
@@ -29,21 +29,6 @@ const departements = [
   { id: '7', code: '07', libelle: 'Gagnoa', region: 'Gôh' },
   { id: '8', code: '08', libelle: 'Divo', region: 'Lôh-Djiboua' },
 ];
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: {
-    code: string;
-  };
-  departements: {
-    id: string;
-    codeDepartement: string;
-    libelleDepartement: string;
-  }[];
-}
 
 interface ManageUserDepartmentsModalProps {
   open: boolean;
@@ -64,7 +49,9 @@ export function ManageUserDepartmentsModal({
   // Charger les départements assignés quand la modale s'ouvre
   useEffect(() => {
     if (user && open) {
-      setSelectedDepartements(user.departements.map(d => d.codeDepartement));
+      // ✅ ADAPTATION : departements est optionnel
+      const userDepartements = user.departements || [];
+      setSelectedDepartements(userDepartements.map(d => d.codeDepartement));
     }
   }, [user, open]);
 
