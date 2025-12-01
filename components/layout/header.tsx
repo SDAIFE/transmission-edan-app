@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { Menu, Settings, User, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Menu, Settings, User, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,55 +11,57 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useSidebar } from '@/store/ui';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { usePathname } from 'next/navigation';
-import Image from 'next/image';
+} from "@/components/ui/dropdown-menu";
+import { useSidebar } from "@/store/ui";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 export function Header() {
-  const { toggleSidebar } = useSidebar();
+  // ✅ CORRECTION : useSidebar retourne { isOpen, toggle, setOpen }
+  const { toggle } = useSidebar();
+  // ✅ CORRECTION : Point-virgule au lieu de deux-points
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  
+
   // Ne pas afficher le header sur la page d'accueil si l'utilisateur n'est pas connecté
-  const isHomePage = pathname === '/';
+  const isHomePage = pathname === "/";
   const shouldShowSidebarToggle = !isHomePage;
 
   const getUserInitials = () => {
-    if (!user) return 'U';
+    if (!user) return "U";
     return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
   };
 
   const getUserDisplayName = () => {
-    if (!user) return 'Utilisateur';
+    if (!user) return "Utilisateur";
     return `${user.firstName} ${user.lastName}`;
   };
 
   const getRoleDisplayName = () => {
-    if (!user?.role) return 'Utilisateur';
-    
+    if (!user?.role) return "Utilisateur";
+
     const roleNames = {
-      USER: 'Utilisateur',
-      ADMIN: 'Administrateur',
-      SADMIN: 'Super Administrateur',
+      USER: "Utilisateur",
+      ADMIN: "Administrateur",
+      SADMIN: "Super Administrateur",
     };
-    
-    return roleNames[user.role.code as keyof typeof roleNames] || 'Utilisateur';
+
+    return roleNames[user.role.code as keyof typeof roleNames] || "Utilisateur";
   };
 
   const handleSignOut = async () => {
     try {
       await logout();
-      toast.success('Déconnexion réussie');
+      toast.success("Déconnexion réussie");
     } catch {
-      toast.error('Erreur lors de la déconnexion');
+      toast.error("Erreur lors de la déconnexion");
     }
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="flex h-16 items-center justify-between px-6">
         {/* Left side */}
         <div className="flex items-center gap-4">
@@ -67,7 +69,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={toggleSidebar}
+              onClick={toggle}
               className="h-8 w-8"
             >
               <Menu className="h-4 w-4" />
@@ -77,10 +79,21 @@ export function Header() {
 
           {/* Logo CEI */}
           <div className="flex items-center gap-2">
-            <Image src="/images/logos/logocei2.webp" alt="CEI" width={32} height={32} />
+            <Image
+              src="/images/logos/logocei2.webp"
+              alt="CEI"
+              width={32}
+              height={32}
+            />
             <div className="hidden sm:block">
-              <h1 className="font-semibold text-lg">TRECIV-Expert | EPR 2025 - Système Expert de Traitement des Résultats des Elections en Côte d’Ivoire</h1>
-              <p className="text-sm text-green-600">Commission Électorale Indépendante - Élection Présidentielle 2025</p>
+              <h1 className="font-semibold text-lg">
+                TRECIV-Expert | EDAN 2025 - Système Expert de Traitement des
+                Résultats des Elections en Côte d’Ivoire
+              </h1>
+              <p className="text-sm text-green-600">
+                Commission Électorale Indépendante - Élection Présidentielle
+                2025
+              </p>
             </div>
           </div>
         </div>
@@ -118,10 +131,7 @@ export function Header() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}
                   </p>
-                  <Badge 
-                    variant="secondary" 
-                    className="w-fit text-xs mt-1"
-                  >
+                  <Badge variant="secondary" className="w-fit text-xs mt-1">
                     {getRoleDisplayName()}
                   </Badge>
                 </div>
@@ -136,7 +146,10 @@ export function Header() {
                 <span>Paramètres</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={handleSignOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Déconnexion</span>
               </DropdownMenuItem>

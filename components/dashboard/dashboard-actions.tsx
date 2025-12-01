@@ -66,7 +66,7 @@ export function DashboardActions({ user }: DashboardActionsProps) {
           title: 'Utilisateurs',
           description: 'Gérer les utilisateurs du système',
           icon: Users,
-          href: '/users',
+          href: '/utilisateurs',
           iconColor: 'text-red-600',
           iconSize: 'h-6 w-6'
         },

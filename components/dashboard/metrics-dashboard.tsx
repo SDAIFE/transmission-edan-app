@@ -1,22 +1,28 @@
 "use client";
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { 
-  Loader2, 
-  BarChart3, 
-  CheckCircle, 
-  Clock, 
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  BarChart3,
+  CheckCircle,
+  Clock,
   RefreshCw,
   TrendingUp,
-  AlertTriangle 
-} from 'lucide-react';
-import { useCirconscriptionMetrics } from '@/hooks/useCirconscriptionMetrics';
-import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+  AlertTriangle,
+} from "lucide-react";
+import { useCirconscriptionMetrics } from "@/hooks/useCirconscriptionMetrics";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 // Props pour le composant
 interface MetricsDashboardProps {
@@ -28,7 +34,7 @@ interface MetricsDashboardProps {
 
 /**
  * Composant de tableau de bord des métriques des circonscriptions
- * 
+ *
  * Caractéristiques :
  * - Vérification automatique des permissions (SADMIN/ADMIN)
  * - États de chargement et d'erreur gérés
@@ -44,14 +50,16 @@ export function MetricsDashboard({
   showRefreshButton = true,
 }: MetricsDashboardProps) {
   const { user, isAuthenticated } = useAuth();
-  const { metrics, loading, error, refetch, lastFetch } = useCirconscriptionMetrics({
-    autoRefresh,
-    refreshInterval,
-    enabled: true,
-  });
+  const { metrics, loading, error, refetch, lastFetch } =
+    useCirconscriptionMetrics({
+      autoRefresh,
+      refreshInterval,
+      enabled: true,
+    });
 
   // ✅ PERMISSIONS : Vérification côté composant
-  const hasPermission = isAuthenticated && ['SADMIN', 'ADMIN'].includes(user?.role?.code || '');
+  const hasPermission =
+    isAuthenticated && ["SADMIN", "ADMIN"].includes(user?.role?.code || "");
 
   // Gestion du rafraîchissement manuel
   const handleRefresh = async () => {
@@ -60,11 +68,11 @@ export function MetricsDashboard({
 
   // Formatage de la date de dernière mise à jour
   const formatLastUpdate = (date: Date | null) => {
-    if (!date) return 'Jamais';
-    return new Intl.DateTimeFormat('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+    if (!date) return "Jamais";
+    return new Intl.DateTimeFormat("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     }).format(date);
   };
 
@@ -76,7 +84,8 @@ export function MetricsDashboard({
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Accès refusé. Seuls les administrateurs (SADMIN/ADMIN) peuvent consulter ces métriques.
+              Accès refusé. Seuls les administrateurs (SADMIN/ADMIN) peuvent
+              consulter ces métriques.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -91,7 +100,9 @@ export function MetricsDashboard({
         <CardContent className="flex items-center justify-center p-8">
           <div className="flex items-center space-x-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="text-muted-foreground">Chargement des métriques...</span>
+            <span className="text-muted-foreground">
+              Chargement des métriques...
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -114,7 +125,9 @@ export function MetricsDashboard({
                   onClick={handleRefresh}
                   disabled={loading}
                 >
-                  <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                  <RefreshCw
+                    className={cn("h-4 w-4 mr-2", loading && "animate-spin")}
+                  />
                   Réessayer
                 </Button>
               )}
@@ -146,13 +159,13 @@ export function MetricsDashboard({
           <BarChart3 className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold">Métriques des Circonscriptions</h2>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {/* Indicateur de dernière mise à jour */}
           <div className="text-sm text-muted-foreground">
             Dernière mise à jour: {formatLastUpdate(lastFetch)}
           </div>
-          
+
           {/* Bouton de rafraîchissement */}
           {showRefreshButton && (
             <Button
@@ -161,7 +174,9 @@ export function MetricsDashboard({
               onClick={handleRefresh}
               disabled={loading}
             >
-              <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+              <RefreshCw
+                className={cn("h-4 w-4 mr-2", loading && "animate-spin")}
+              />
               Actualiser
             </Button>
           )}
@@ -177,13 +192,15 @@ export function MetricsDashboard({
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.total.toLocaleString('fr-FR')}</div>
+            <div className="text-2xl font-bold">
+              {metrics.total.toLocaleString("fr-FR")}
+            </div>
             <p className="text-xs text-muted-foreground">
               Circonscriptions totales
             </p>
           </CardContent>
         </Card>
-        
+
         {/* Circonscriptions publiées */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -192,14 +209,14 @@ export function MetricsDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {metrics.published.toLocaleString('fr-FR')}
+              {metrics.published.toLocaleString("fr-FR")}
             </div>
             <p className="text-xs text-muted-foreground">
               {metrics.publishedPercentage.toFixed(1)}% du total
             </p>
           </CardContent>
         </Card>
-        
+
         {/* Circonscriptions restantes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -208,11 +225,9 @@ export function MetricsDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {metrics.remaining.toLocaleString('fr-FR')}
+              {metrics.remaining.toLocaleString("fr-FR")}
             </div>
-            <p className="text-xs text-muted-foreground">
-              À publier
-            </p>
+            <p className="text-xs text-muted-foreground">À publier</p>
           </CardContent>
         </Card>
       </div>
@@ -227,7 +242,9 @@ export function MetricsDashboard({
                 Progression de la publication
               </CardTitle>
               <CardDescription>
-                {metrics.published.toLocaleString('fr-FR')} sur {metrics.total.toLocaleString('fr-FR')} circonscriptions publiées
+                {metrics.published.toLocaleString("fr-FR")} sur{" "}
+                {metrics.total.toLocaleString("fr-FR")} circonscriptions
+                publiées
               </CardDescription>
             </div>
             <div className="text-right">
@@ -239,8 +256,8 @@ export function MetricsDashboard({
           </div>
         </CardHeader>
         <CardContent>
-          <Progress 
-            value={metrics.publishedPercentage} 
+          <Progress
+            value={metrics.publishedPercentage}
             className="w-full h-3"
           />
           <div className="flex justify-between text-sm text-muted-foreground mt-2">
@@ -251,19 +268,8 @@ export function MetricsDashboard({
         </CardContent>
       </Card>
 
-      {/* Indicateur de rafraîchissement automatique */}
-      {autoRefresh && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>
-                Rafraîchissement automatique toutes les {Math.round(refreshInterval / 1000)} secondes
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* ✅ Indicateur de rafraîchissement automatique masqué mais le rafraîchissement reste actif */}
+      {/* Le rafraîchissement automatique est géré par useCirconscriptionMetrics */}
     </div>
   );
 }
@@ -272,18 +278,17 @@ export function MetricsDashboard({
  * Version simplifiée du composant pour utilisation rapide
  */
 export function SimpleMetricsDashboard() {
-  return (
-    <MetricsDashboard
-      autoRefresh={false}
-      showRefreshButton={true}
-    />
-  );
+  return <MetricsDashboard autoRefresh={false} showRefreshButton={true} />;
 }
 
 /**
  * Version avec rafraîchissement automatique
  */
-export function LiveMetricsDashboard({ refreshInterval = 30000 }: { refreshInterval?: number }) {
+export function LiveMetricsDashboard({
+  refreshInterval = 30000,
+}: {
+  refreshInterval?: number;
+}) {
   return (
     <MetricsDashboard
       autoRefresh={true}
