@@ -117,6 +117,71 @@ export function CreateUserModal({
     })
   );
 
+  // ✅ NOUVEAU : Fonction pour extraire et formater les erreurs du backend
+  const formatBackendError = (error: unknown): string => {
+    // Vérifier si c'est une erreur Axios avec response
+    if (error && typeof error === "object" && "response" in error) {
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string | string[];
+            error?: string;
+            statusCode?: number;
+          };
+          status?: number;
+        };
+      };
+
+      const responseData = axiosError.response?.data;
+      const statusCode =
+        responseData?.statusCode || axiosError.response?.status;
+      const errorType = responseData?.error; // Ex: "Bad Request"
+
+      // Extraire les messages (peuvent être un tableau ou une chaîne)
+      let messages: string[] = [];
+      if (responseData?.message) {
+        if (Array.isArray(responseData.message)) {
+          messages = responseData.message;
+        } else if (typeof responseData.message === "string") {
+          messages = [responseData.message];
+        }
+      } else if (errorType) {
+        messages = [errorType];
+      }
+
+      // Formater le message final avec le statusCode de manière conviviale
+      if (messages.length > 0) {
+        // Joindre les messages avec des points-virgules pour une meilleure lisibilité
+        const messagesText = messages.join(" • ");
+
+        // Formater le statusCode de manière conviviale
+        let statusText = "";
+        if (statusCode) {
+          if (errorType) {
+            statusText = ` [${statusCode} - ${errorType}]`;
+          } else {
+            statusText = ` [Erreur ${statusCode}]`;
+          }
+        }
+
+        return `${messagesText}${statusText}`;
+      }
+
+      // Fallback avec statusCode si pas de message
+      if (statusCode) {
+        return `Erreur ${statusCode}: Une erreur s'est produite lors de la création de l'utilisateur`;
+      }
+    }
+
+    // Gestion des erreurs Error standard
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    // Message par défaut
+    return "Erreur lors de la création de l'utilisateur";
+  };
+
   const onSubmit = async (formData: CreateUserFormData) => {
     try {
       setLoading(true);
@@ -155,11 +220,11 @@ export function CreateUserModal({
       onSuccess?.();
     } catch (error: unknown) {
       console.error("Erreur lors de la création:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Erreur lors de la création de l'utilisateur";
-      toast.error(errorMessage);
+      const errorMessage = formatBackendError(error);
+      // ✅ Afficher le message d'erreur formaté avec support des sauts de ligne
+      toast.error(errorMessage, {
+        duration: 6000, // Durée plus longue pour les messages d'erreur détaillés
+      });
     } finally {
       setLoading(false);
     }
