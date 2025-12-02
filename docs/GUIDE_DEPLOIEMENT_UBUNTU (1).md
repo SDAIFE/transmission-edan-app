@@ -80,10 +80,10 @@ git config --list
 
 ```bash
 # Générer une nouvelle clé SSH (si vous n'en avez pas déjà)
-ssh-keygen -t ed25519 -C "votre.email@example.com"
+#ssh-keygen -t ed25519 -C "votre.email@example.com"
 
 # Ou utiliser RSA si ed25519 n'est pas supporté
-# ssh-keygen -t rsa -b 4096 -C "votre.email@example.com"
+ssh-keygen -t rsa -b 4096 -C "votre.email@example.com"
 
 # Appuyez sur Entrée pour accepter l'emplacement par défaut
 # Entrez un mot de passe fort (ou laissez vide pour aucune passphrase)
@@ -96,18 +96,18 @@ ssh-keygen -t ed25519 -C "votre.email@example.com"
 eval "$(ssh-agent -s)"
 
 # Ajouter la clé SSH à l'agent
-ssh-add ~/.ssh/id_ed25519
+#ssh-add ~/.ssh/id_ed25519
 # OU si vous avez utilisé RSA
-# ssh-add ~/.ssh/id_rsa
+ ssh-add ~/.ssh/id_rsa_manu
 ```
 
 ### 2.4 Ajout de la clé publique à GitHub
 
 ```bash
 # Afficher la clé publique
-cat ~/.ssh/id_ed25519.pub
+#cat ~/.ssh/id_ed25519.pub
 # OU
-# cat ~/.ssh/id_rsa.pub
+ cat ~/.ssh/id_rsa_manu.pub
 
 # Copiez tout le contenu affiché
 ```

@@ -3,23 +3,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardApi } from '@/lib/api/dashboard';
-import type { 
-  UserDashboardStatsDto, 
+import type {
+  UserDashboardStatsDto,
   AdminDashboardStatsDto,
   SadminDashboardStatsDto,
-  DashboardFiltersDto 
+  DashboardFiltersDto
 } from '@/types/dashboard';
 
 interface UseDashboardMetricsReturn {
   // Données
   userMetrics: UserDashboardStatsDto | null;
   adminMetrics: AdminDashboardStatsDto | SadminDashboardStatsDto | null;
-  
+
   // États
   loading: boolean;
   error: string | null;
   lastUpdated: Date | null;
-  
+
   // Actions
   refreshMetrics: () => Promise<void>;
   clearError: () => void;
@@ -57,18 +57,43 @@ export function useDashboardMetrics(filters?: DashboardFiltersDto): UseDashboard
         if (process.env.NODE_ENV === 'development') {
           console.log('🔍 [useDashboardMetrics] Récupération des métriques utilisateur...');
         }
-        
+
         try {
           const metrics = await dashboardApi.getUserDashboardMetrics();
           if (process.env.NODE_ENV === 'development') {
             console.log('📊 [useDashboardMetrics] Métriques utilisateur reçues:', metrics);
           }
-          setUserMetrics(metrics);
+
+          // ✅ CORRECTION : Normaliser les données pour s'assurer que toutes les propriétés sont définies
+          const normalizedMetrics: UserDashboardStatsDto = {
+            totalCels: metrics.totalCels ?? 0,
+            celsAvecImport: metrics.celsAvecImport ?? 0,
+            celsSansImport: metrics.celsSansImport ?? 0,
+            tauxProgression: metrics.tauxProgression ?? 0,
+            celsParStatut: metrics.celsParStatut ?? {
+              pending: 0,
+              imported: 0,
+              error: 0,
+              processing: 0
+            },
+            nombreErreurs: metrics.nombreErreurs ?? 0,
+            alertes: metrics.alertes ?? {
+              celsSansImport: 0,
+              celsEnErreur: 0,
+              celsEnAttente: 0
+            },
+            celsAssignees: metrics.celsAssignees ?? 0,
+            celsAvecImportAssignees: metrics.celsAvecImportAssignees ?? 0,
+            celsSansImportAssignees: metrics.celsSansImportAssignees ?? 0,
+            tauxProgressionPersonnel: metrics.tauxProgressionPersonnel ?? 0
+          };
+
+          setUserMetrics(normalizedMetrics);
           setAdminMetrics(null);
         } catch (apiError: any) {
           console.warn('⚠️ [useDashboardMetrics] API non disponible, utilisation des données mockées');
           console.error('❌ [useDashboardMetrics] Erreur API:', apiError);
-          
+
           // Données mockées temporaires pour USER
           const mockUserMetrics = {
             totalCels: 150,
@@ -92,18 +117,18 @@ export function useDashboardMetrics(filters?: DashboardFiltersDto): UseDashboard
             celsSansImportAssignees: 30,
             tauxProgressionPersonnel: 80.0
           };
-          
+
           setUserMetrics(mockUserMetrics);
           setAdminMetrics(null);
           setError('API non disponible - Données de démonstration');
         }
-        
+
       } else if (userRole === 'ADMIN' || userRole === 'SADMIN') {
         // Pour les administrateurs : toutes les données
         if (process.env.NODE_ENV === 'development') {
           console.log('🔍 [useDashboardMetrics] Récupération des métriques admin...');
         }
-        
+
         try {
           const metrics = await dashboardApi.getAdminDashboardMetrics();
           if (process.env.NODE_ENV === 'development') {
@@ -114,7 +139,7 @@ export function useDashboardMetrics(filters?: DashboardFiltersDto): UseDashboard
         } catch (apiError: any) {
           console.warn('⚠️ [useDashboardMetrics] API non disponible, utilisation des données mockées');
           console.error('❌ [useDashboardMetrics] Erreur API:', apiError);
-          
+
           // Données mockées temporaires pour ADMIN/SADMIN
           const mockAdminMetrics = userRole === 'SADMIN' ? {
             totalCels: 564,
@@ -168,7 +193,7 @@ export function useDashboardMetrics(filters?: DashboardFiltersDto): UseDashboard
               celsEnAttente: 50
             }
           };
-          
+
           setAdminMetrics(mockAdminMetrics);
           setUserMetrics(null);
           setError('API non disponible - Données de démonstration');

@@ -66,9 +66,9 @@ export const API_CONFIG = {
       byRegion: '/departements/region',
     },
     upload: {
-      excel: '/upload/excel',
-      imports: '/upload/imports',
-      stats: '/upload/stats',
+      excel: '/legislatives/upload/excel',
+      imports: '/legislatives/upload/imports',
+      stats: '/legislatives/upload/stats',
       importsByCel: '/upload/imports/cel',
       importsByStatus: '/upload/imports/statut',
     },

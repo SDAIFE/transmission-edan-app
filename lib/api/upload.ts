@@ -1,23 +1,25 @@
 import { apiClient, uploadClient } from "./client";
-import * as XLSX from "xlsx";
 import type {
   ImportData,
   ImportListResponse,
   ImportStats,
   ImportFilters,
   UploadRequestParams,
-  UploadResponse,
   CelDataResponse,
 } from "@/types/upload";
 import { ImportStatus } from "@/types/upload";
 
 // Service API pour l'upload de fichiers Excel
 export const uploadApi = {
-  // ✅ NOUVEAU : Upload fichier .xlsm + CSV directement au backend
+  // ✅ CORRECTION : Upload fichier .xlsm uniquement (le backend fait la conversion)
+  // Selon la documentation : Le frontend envoie uniquement le fichier Excel (.xlsm)
+  // Le backend convertit en CSV, extrait les métadonnées et insère les données
   uploadExcel: async (params: UploadRequestParams): Promise<ImportData> => {
     try {
       if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
         console.log("📤 [UploadAPI] Upload du fichier Excel (.xlsm)...");
+        // eslint-disable-next-line no-console
         console.log("📋 [UploadAPI] Paramètres:", {
           fileName: params.file.name,
           codeCellule: params.codeCellule,
@@ -25,82 +27,52 @@ export const uploadApi = {
         });
       }
 
-      // 1. ✅ Validation stricte : UNIQUEMENT .xlsm
-      if (!params.file.name.endsWith(".xlsm")) {
-        throw new Error("Seuls les fichiers .xlsm sont autorisés");
+      // 1. ✅ Validation : .xlsm ou .xlsx (selon la doc, les deux sont acceptés)
+      const isValidExtension =
+        params.file.name.endsWith(".xlsm") ||
+        params.file.name.endsWith(".xlsx");
+
+      if (!isValidExtension) {
+        throw new Error("Type de fichier invalide. Seuls les fichiers .xlsm et .xlsx sont acceptés.");
       }
 
-      // 2. ✅ Convertir Excel (.xlsm) → CSV côté client
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "🔄 [UploadAPI] Conversion Excel (.xlsm) vers CSV côté client..."
-        );
-      }
-      const csvFile = await convertExcelToCsv(params.file);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ [UploadAPI] Conversion terminée:", {
-          original: params.file.name,
-          converted: csvFile.name,
-          originalSize: `${(params.file.size / 1024 / 1024).toFixed(2)}MB`,
-          csvSize: `${(csvFile.size / 1024).toFixed(2)}KB`,
-        });
+      // 2. ✅ Validation de la taille (10MB max)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (params.file.size > maxSize) {
+        throw new Error("Le fichier est trop volumineux. Taille maximale : 10MB");
       }
 
-      // 3. ✅ VALIDATION : Vérifier que le code CEL dans le CSV correspond
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "🔍 [UploadAPI] Validation du code CEL dans le fichier CSV..."
-        );
-      }
-      const validation = await validateCelCodeInCsv(
-        csvFile,
-        params.codeCellule
-      );
-
-      if (!validation.isValid) {
-        console.error("❌ [UploadAPI] Validation échouée:", validation.message);
-        throw new Error(validation.message);
-      }
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ [UploadAPI] Validation réussie:", validation.message);
-      }
-
-      // 4. ✅ Envoyer LES DEUX fichiers au backend NestJS
+      // 3. ✅ Envoyer UNIQUEMENT le fichier Excel au backend
+      // Le backend se charge de la conversion CSV et de la validation
       const formData = new FormData();
-      formData.append("excelFile", params.file); // ✅ Fichier .xlsm original
-      formData.append("csvFile", csvFile); // ✅ Fichier CSV converti
-      formData.append("codeCellule", params.codeCellule);
+      formData.append("excelFile", params.file); // ✅ Fichier Excel uniquement
+      formData.append("codCel", params.codeCellule); // ✅ Utiliser "codCel" selon la doc
 
-      if (params.nomFichier) {
-        formData.append("nomFichier", params.nomFichier);
-      }
-
-      if (params.nombreBv) {
-        formData.append("nombreBv", params.nombreBv.toString());
-      }
-
-      // 5. ✅ Utiliser uploadClient (60s timeout pour fichiers volumineux)
-      const response = await uploadClient.post("/upload/excel", formData, {
+      // 4. ✅ Utiliser uploadClient (timeout plus long pour fichiers volumineux)
+      const response = await uploadClient.post("legislatives/upload/excel", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-          );
-          if (process.env.NODE_ENV === "development") {
-            console.log(`📊 [UploadAPI] Progression: ${percentCompleted}%`);
+          if (progressEvent.total) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            if (process.env.NODE_ENV === "development") {
+              // eslint-disable-next-line no-console
+              console.log(`📊 [UploadAPI] Progression: ${percentCompleted}%`);
+            }
           }
         },
       });
 
       if (process.env.NODE_ENV === "development") {
-        console.log(
-          "✅ [UploadAPI] Fichiers traités avec succès par le backend:",
-          response.data.nomFichier
-        );
+        // eslint-disable-next-line no-console
+        console.log("✅ [UploadAPI] Fichier traité avec succès par le backend:", {
+          importId: response.data.importId,
+          codCel: response.data.codCel,
+          nombreBureauxTraites: response.data.nombreBureauxTraites,
+        });
       }
 
       return response.data;
@@ -128,8 +100,8 @@ export const uploadApi = {
           `Erreur serveur (${axiosError.response.status})`;
 
         const uploadError = new Error(errorMessage);
-        (uploadError as any).status = axiosError.response.status;
-        (uploadError as any).details = axiosError.response.data;
+        (uploadError as { status?: number; details?: unknown }).status = axiosError.response.status;
+        (uploadError as { status?: number; details?: unknown }).details = axiosError.response.data;
         throw uploadError;
       }
 
@@ -164,8 +136,8 @@ export const uploadApi = {
 
       const queryString = queryParams.toString();
       const url = queryString
-        ? `/upload/imports?${queryString}`
-        : "/upload/imports";
+        ? `legislatives/upload/imports?${queryString}`
+        : "legislatives/upload/imports";
 
       if (process.env.NODE_ENV === "development") {
         console.log("🌐 [UploadAPI] Requête GET imports:", {
@@ -221,7 +193,7 @@ export const uploadApi = {
   // Récupérer les statistiques des imports
   getStats: async (): Promise<ImportStats | null> => {
     try {
-      const response = await apiClient.get("/upload/stats");
+      const response = await apiClient.get("legislatives/upload/stats");
       return response.data;
     } catch (error: any) {
       // Si l'erreur est 403 (Forbidden), l'utilisateur n'a pas les permissions
@@ -386,173 +358,7 @@ export const uploadApi = {
   },
 };
 
-// ✅ Fonction utilitaire : Valider que le code CEL dans le CSV correspond
-// Vérifie dans C3 ET C4 pour être flexible avec différents formats
-export const validateCelCodeInCsv = async (
-  csvFile: File,
-  expectedCelCode: string
-): Promise<{
-  isValid: boolean;
-  foundCode: string | null;
-  foundInCell: string | null;
-  message: string;
-}> => {
-  try {
-    // Lire le contenu du fichier CSV
-    const csvContent = await csvFile.text();
-
-    // Séparer les lignes
-    const lines = csvContent.split("\n");
-
-    // Vérifier qu'on a au moins 4 lignes
-    if (lines.length < 4) {
-      return {
-        isValid: false,
-        foundCode: null,
-        foundInCell: null,
-        message: "Fichier CSV invalide : moins de 4 lignes",
-      };
-    }
-
-    // ✅ Vérifier C3 (ligne 3, index 2)
-    const line3 = lines[2];
-    const columnsLine3 = line3.split(";");
-    const cellC3 = columnsLine3[2]?.trim() || "";
-
-    // ✅ Vérifier C4 (ligne 4, index 3)
-    const line4 = lines[3];
-    const columnsLine4 = line4.split(";");
-    const cellC4 = columnsLine4[2]?.trim() || "";
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 [Validation] Cellules extraites:", {
-        cellC3,
-        cellC4,
-        expectedCelCode,
-        matchC3: cellC3 === expectedCelCode,
-        matchC4: cellC4 === expectedCelCode,
-      });
-    }
-
-    // ✅ Comparer C3 avec le code attendu
-    if (cellC3 === expectedCelCode) {
-      return {
-        isValid: true,
-        foundCode: cellC3,
-        foundInCell: "C3",
-        message: `✅ Le fichier correspond bien à la CEL ${expectedCelCode} (trouvé en C3)`,
-      };
-    }
-
-    // ✅ Comparer C4 avec le code attendu
-    if (cellC4 === expectedCelCode) {
-      return {
-        isValid: true,
-        foundCode: cellC4,
-        foundInCell: "C4",
-        message: `✅ Le fichier correspond bien à la CEL ${expectedCelCode} (trouvé en C4)`,
-      };
-    }
-
-    // ❌ Aucune des deux cellules ne correspond
-    return {
-      isValid: false,
-      foundCode: cellC3 || cellC4,
-      foundInCell: null,
-      message: `❌ Le fichier ne correspond pas à la CEL sélectionnée. Trouvé en C3: "${cellC3}", C4: "${cellC4}", Attendu: "${expectedCelCode}"`,
-    };
-  } catch (error) {
-    console.error("❌ [Validation] Erreur lors de la validation:", error);
-    return {
-      isValid: false,
-      foundCode: null,
-      foundInCell: null,
-      message: "Erreur lors de la lecture du fichier CSV",
-    };
-  }
-};
-
-// ✅ Fonction utilitaire : Convertir un fichier Excel (.xlsm) en CSV
-export const convertExcelToCsv = async (file: File): Promise<File> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        if (!data) {
-          reject(new Error("Impossible de lire le fichier"));
-          return;
-        }
-
-        // Lire le fichier Excel
-        const workbook = XLSX.read(data, { type: "binary" });
-
-        // Prendre la première feuille
-        const firstSheetName = workbook.SheetNames[0];
-        if (!firstSheetName) {
-          reject(new Error("Aucune feuille trouvée dans le fichier Excel"));
-          return;
-        }
-
-        const worksheet = workbook.Sheets[firstSheetName];
-
-        // Convertir en CSV avec séparateur point-virgule
-        const csvData = XLSX.utils.sheet_to_csv(worksheet, {
-          FS: ";", // Séparateur point-virgule
-          blankrows: false, // Ignorer les lignes vides
-          skipHidden: true, // Ignorer les lignes/colonnes cachées
-        });
-
-        // Créer un nouveau fichier CSV
-        const csvBlob = new Blob([csvData], {
-          type: "text/csv;charset=utf-8;",
-        });
-
-        // Générer le nom du fichier CSV
-        const originalName = file.name.replace(/\.(xlsx|xls|xlsm)$/i, "");
-        const csvFileName = `${originalName}.csv`;
-
-        // Créer le fichier CSV
-        const csvFile = new File([csvBlob], csvFileName, {
-          type: "text/csv",
-          lastModified: Date.now(),
-        });
-
-        if (process.env.NODE_ENV === "development") {
-        console.log("✅ [UploadAPI] Fichier Excel converti en CSV:", {
-          original: file.name,
-            converted: csvFileName,
-            size: `${(csvFile.size / 1024).toFixed(2)}KB`,
-          });
-        }
-
-        resolve(csvFile);
-      } catch (error) {
-        console.error(
-          "❌ [UploadAPI] Erreur lors de la conversion Excel vers CSV:",
-          error
-        );
-        reject(
-          new Error(
-            `Erreur de conversion: ${
-              error instanceof Error ? error.message : "Erreur inconnue"
-            }`
-          )
-        );
-      }
-    };
-
-    reader.onerror = () => {
-      reject(new Error("Erreur lors de la lecture du fichier"));
-    };
-
-    // Lire le fichier en binaire pour XLSX
-    reader.readAsBinaryString(file);
-  });
-};
-
-// ✅ Valider le type de fichier (UNIQUEMENT .xlsm)
+// ✅ Valider le type de fichier (.xlsm ou .xlsx)
 export const validateFileType = (
   file: File,
   allowedTypes: string[]

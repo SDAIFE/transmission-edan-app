@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +18,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  MoreHorizontal, 
-  Eye, 
-  Download, 
-  Trash2, 
+} from "@/components/ui/dropdown-menu";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  MoreHorizontal,
+  Eye,
+  Download,
+  Trash2,
   RefreshCw,
   FileSpreadsheet,
   Calendar,
@@ -32,16 +38,16 @@ import {
   AlertTriangle,
   CheckCircle,
   ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { formatFileSize } from '@/lib/api/upload';
-import { ImportStatusBadge, ImportStatusDetails } from './import-status-badge';
-import { CelDetailsModal } from './cel-details-modal';
-import type { ImportsTableProps, ImportData } from '@/types/upload';
+  ChevronRight,
+} from "lucide-react";
+import { formatFileSize } from "@/lib/api/upload";
+import { ImportStatusBadge, ImportStatusDetails } from "./import-status-badge";
+import { CelDetailsModal } from "./cel-details-modal";
+import type { ImportsTableProps, ImportData } from "@/types/upload";
 
-export function ImportsTable({ 
-  imports, 
-  loading = false, 
+export function ImportsTable({
+  imports,
+  loading = false,
   onRefresh,
   onViewDetails,
   onDownload,
@@ -50,7 +56,7 @@ export function ImportsTable({
   total,
   currentPage = 1,
   totalPages = 1,
-  onPageChange
+  onPageChange,
 }: ImportsTableProps & {
   total?: number;
   currentPage?: number;
@@ -59,25 +65,26 @@ export function ImportsTable({
 }) {
   const [selectedImport, setSelectedImport] = useState<string | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [selectedImportData, setSelectedImportData] = useState<ImportData | null>(null);
+  const [selectedImportData, setSelectedImportData] =
+    useState<ImportData | null>(null);
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Date inconnue';
-    
+    if (!dateString) return "Date inconnue";
+
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      if(process.env.NODE_ENV === 'development') {
-        console.warn('🔍 [ImportsTable] Date invalide:', dateString);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("🔍 [ImportsTable] Date invalide:", dateString);
       }
-      return 'Date invalide';
+      return "Date invalide";
     }
-    
-    return date.toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+
+    return date.toLocaleString("fr-FR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -91,13 +98,17 @@ export function ImportsTable({
     const lignes = importData.nombreLignesImportees || 0;
     const bureaux = importData.nombreBureauxVote || 0;
     const difference = Math.abs(lignes - bureaux);
-    
+
     if (lignes > bureaux) {
-      return `${difference} ligne${difference > 1 ? 's' : ''} en trop (${lignes} lignes vs ${bureaux} bureaux)`;
+      return `${difference} ligne${
+        difference > 1 ? "s" : ""
+      } en trop (${lignes} lignes vs ${bureaux} bureaux)`;
     } else if (bureaux > lignes) {
-      return `${difference} bureau${difference > 1 ? 'x' : ''} manquant${difference > 1 ? 's' : ''} (${lignes} lignes vs ${bureaux} bureaux)`;
+      return `${difference} bureau${difference > 1 ? "x" : ""} manquant${
+        difference > 1 ? "s" : ""
+      } (${lignes} lignes vs ${bureaux} bureaux)`;
     }
-    return '';
+    return "";
   };
 
   const handleAction = (action: () => void, importId: string) => {
@@ -120,6 +131,8 @@ export function ImportsTable({
     setSelectedImportData(null);
   };
 
+console.log ("Imports", imports);
+  
   if (loading) {
     return (
       <Card>
@@ -130,7 +143,10 @@ export function ImportsTable({
         <CardContent>
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center space-x-4 p-4 border rounded">
+              <div
+                key={index}
+                className="flex items-center space-x-4 p-4 border rounded"
+              >
                 <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
                 <div className="space-y-2 flex-1">
                   <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
@@ -146,7 +162,7 @@ export function ImportsTable({
   }
 
   return (
-    <Card  className="border-none shadow-none">
+    <Card className="border-none shadow-none">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -155,10 +171,19 @@ export function ImportsTable({
               Imports
             </CardTitle>
             <CardDescription>
-              {imports.length} feuille{imports.length > 1 ? 's' : ''} Excel au total
-              {imports.filter(imp => !isDataConsistent(imp)).length > 0 && (
+              {imports.length} feuille{imports.length > 1 ? "s" : ""} Excel au
+              total
+              {imports.filter((imp) => !isDataConsistent(imp)).length > 0 && (
                 <span className="text-orange-600 font-medium ml-2">
-                  • {imports.filter(imp => !isDataConsistent(imp)).length} incohérence{imports.filter(imp => !isDataConsistent(imp)).length > 1 ? 's' : ''} détectée{imports.filter(imp => !isDataConsistent(imp)).length > 1 ? 's' : ''}
+                  • {imports.filter((imp) => !isDataConsistent(imp)).length}{" "}
+                  incohérence
+                  {imports.filter((imp) => !isDataConsistent(imp)).length > 1
+                    ? "s"
+                    : ""}{" "}
+                  détectée
+                  {imports.filter((imp) => !isDataConsistent(imp)).length > 1
+                    ? "s"
+                    : ""}
                 </span>
               )}
             </CardDescription>
@@ -170,7 +195,7 @@ export function ImportsTable({
             </Button>
           )}
         </div>
-        
+
         {/* Légende des indicateurs */}
         <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
@@ -209,27 +234,49 @@ export function ImportsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {imports.map((importData) => (
-                <TableRow 
-                  key={importData.id}
-                  className={`${selectedImport === importData.id ? 'bg-muted/50' : ''} ${!isDataConsistent(importData) ? 'hover:bg-orange-50/50 bg-orange-50/30' : ''}`}
-                  title={!isDataConsistent(importData) ? getInconsistencyTooltip(importData) : undefined}
+              {imports.map((importData, index) => (
+                <TableRow
+                  key={
+                    importData.id ||
+                    `import-${index}-${importData.codeCellule}-${importData.dateImport}`
+                  }
+                  className={`${
+                    selectedImport === importData.id ? "bg-muted/50" : ""
+                  } ${
+                    !isDataConsistent(importData)
+                      ? "hover:bg-orange-50/50 bg-orange-50/30"
+                      : ""
+                  }`}
+                  title={
+                    !isDataConsistent(importData)
+                      ? getInconsistencyTooltip(importData)
+                      : undefined
+                  }
                 >
+                  
                   {/* Nom du fichier */}
-                  <TableCell className={!isDataConsistent(importData) ? 'border-l-4 border-l-orange-400 pl-3' : ''}>
+                  <TableCell
+                    className={
+                      !isDataConsistent(importData)
+                        ? "border-l-4 border-l-orange-400 pl-3"
+                        : ""
+                    }
+                  >
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet className="h-4 w-4 text-blue-600" />
                       <div>
                         <div className="font-medium text-sm">
-                          {importData.nomFichier} {/* libelleCellule dans la réponse backend */}
+                          {importData.nomFichier}{" "}
+                          {/* libelleCellule dans la réponse backend */}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatFileSize(importData.nomFichier.length * 1000)} {/* Estimation */}
+                          {formatFileSize(importData.nomFichier.length * 1000)}{" "}
+                          {/* Estimation */}
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  
+
                   {/* ✨ NOUVEAU : Utilisateur (nom, prénoms) */}
                   <TableCell>
                     {importData.importePar ? (
@@ -249,7 +296,10 @@ export function ImportsTable({
                   {/* ✨ NOUVEAU : Région */}
                   <TableCell>
                     {importData.region ? (
-                      <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-blue-50 border-blue-200"
+                      >
                         {importData.region.libelleRegion}
                       </Badge>
                     ) : (
@@ -260,19 +310,22 @@ export function ImportsTable({
                   {/* ✨ NOUVEAU : Département */}
                   <TableCell>
                     {importData.departement ? (
-                      <Badge variant="outline" className="text-xs bg-green-50 border-green-200">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-green-50 border-green-200"
+                      >
                         {importData.departement.libelleDepartement}
                       </Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  
+
                   {/* Statut */}
                   <TableCell>
                     <ImportStatusBadge status={importData.statutImport} />
                   </TableCell>
-                  
+
                   {/* Date */}
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
@@ -280,7 +333,7 @@ export function ImportsTable({
                       {formatDate(importData.dateImport)}
                     </div>
                   </TableCell>
-                   
+
                   {/* Nombre de bureaux */}
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
@@ -291,11 +344,13 @@ export function ImportsTable({
                           (aucune donnée)
                         </span>
                       )}
-                      {isDataConsistent(importData) && (importData.nombreLignesImportees > 0 || importData.nombreBureauxVote > 0) && (
-                        <div title="Données cohérentes">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                        </div>
-                      )}
+                      {isDataConsistent(importData) &&
+                        (importData.nombreLignesImportees > 0 ||
+                          importData.nombreBureauxVote > 0) && (
+                          <div title="Données cohérentes">
+                            <CheckCircle className="h-3 w-3 text-green-500" />
+                          </div>
+                        )}
                     </div>
                   </TableCell>
 
@@ -321,7 +376,7 @@ export function ImportsTable({
                       )}
                     </div>
                   </TableCell>
-                  
+
                   {/* Actions */}
                   <TableCell>
                     <DropdownMenu>
@@ -333,29 +388,44 @@ export function ImportsTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem 
-                          onClick={() => handleAction(() => handleViewDetails(importData), importData.id)}
+
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleAction(
+                              () => handleViewDetails(importData),
+                              importData.id
+                            )
+                          }
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           Voir les détails
                         </DropdownMenuItem>
-                        
+
                         {onDownload && (
-                          <DropdownMenuItem 
-                            onClick={() => handleAction(() => onDownload(importData), importData.id)}
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleAction(
+                                () => onDownload(importData),
+                                importData.id
+                              )
+                            }
                           >
                             <Download className="mr-2 h-4 w-4" />
                             Télécharger
                           </DropdownMenuItem>
                         )}
-                        
+
                         <DropdownMenuSeparator />
-                        
+
                         {onDelete && (
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-red-600"
-                            onClick={() => handleAction(() => onDelete(importData), importData.id)}
+                            onClick={() =>
+                              handleAction(
+                                () => onDelete(importData),
+                                importData.id
+                              )
+                            }
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Supprimer
@@ -382,10 +452,11 @@ export function ImportsTable({
       {total !== undefined && totalPages > 1 && (
         <div className="flex items-center justify-between px-2 py-4 border-t">
           <div className="text-sm text-muted-foreground">
-            Affichage de <span className="font-medium">{imports.length}</span> sur{' '}
-            <span className="font-medium">{total}</span> import{total > 1 ? 's' : ''}
+            Affichage de <span className="font-medium">{imports.length}</span>{" "}
+            sur <span className="font-medium">{total}</span> import
+            {total > 1 ? "s" : ""}
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -396,13 +467,13 @@ export function ImportsTable({
               <ChevronLeft className="h-4 w-4" />
               Précédent
             </Button>
-            
+
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Page {currentPage} sur {totalPages}
               </span>
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"

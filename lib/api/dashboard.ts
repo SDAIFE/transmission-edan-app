@@ -58,11 +58,11 @@ export const dashboardApi = {
   async getUserDashboardMetrics(): Promise<UserDashboardStatsDto> {
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('🌐 [DashboardAPI] Appel GET /dashboard/user-metrics (via proxy Next.js)');
+        console.warn('🌐 [DashboardAPI] Appel GET /metrics/user-metrics (via proxy Next.js)');
       }
 
       // ✅ PROXY : Utilise apiClient qui passe automatiquement par le proxy Next.js
-      const response = await apiClient.get('/dashboard/user-metrics');
+      const response = await apiClient.get('/metrics/user-metrics');
 
       if (process.env.NODE_ENV === 'development') {
         console.warn('📡 [DashboardAPI] Réponse reçue:', {

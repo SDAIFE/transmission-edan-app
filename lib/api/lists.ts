@@ -79,7 +79,7 @@ export const listsApi = {
   // ✨ NOUVEAU : Récupérer la liste simple des régions
   getRegionsList: async (): Promise<SimpleRegion[]> => {
     try {
-      const response = await apiClient.get('/regions/list/simple');
+      const response = await apiClient.get('legislatives/regions/list/simple');
       return response.data;
     } catch (error: unknown) {
       const axiosError = error as AxiosError;

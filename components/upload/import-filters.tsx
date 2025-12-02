@@ -1,60 +1,79 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
-import { Filter, X, RefreshCw } from 'lucide-react';
-import { ImportStatus } from '@/types/upload';
-import { listsApi } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
-import type { ImportFiltersProps } from '@/types/upload';
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
+import { Filter, X } from "lucide-react";
+import { ImportStatus } from "@/types/upload";
+import { useAuth } from "@/contexts/AuthContext";
+import type { ImportFiltersProps, ImportData } from "@/types/upload";
 
 interface ExtendedImportFiltersProps extends ImportFiltersProps {
   availableRegions?: { codeRegion: string; libelleRegion: string }[];
-  availableDepartments?: { codeDepartement: string; libelleDepartement: string }[];
-  imports?: any[]; // Pour extraire les régions/départements réellement présents
+  availableDepartments?: {
+    codeDepartement: string;
+    libelleDepartement: string;
+  }[];
+  imports?: ImportData[]; // Pour extraire les régions/départements réellement présents
 }
 
-export function ImportFilters({ 
-  filters, 
-  onFiltersChange, 
+export function ImportFilters({
+  filters,
+  onFiltersChange,
   availableCels,
   availableRegions = [],
   availableDepartments = [],
   imports = [],
-  loading = false 
 }: ExtendedImportFiltersProps) {
-  const [selectedCels, setSelectedCels] = useState<string[]>(
-    filters.codeCellule ? [filters.codeCellule] : []
+  // ✅ CORRECTION : Gérer les CELs séparées par des virgules
+  const [selectedCels, setSelectedCels] = useState<string[]>(() => {
+    if (filters.codeCellule) {
+      // Si codeCellule contient des virgules, splitter
+      return filters.codeCellule.includes(",")
+        ? filters.codeCellule
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : [filters.codeCellule];
+    }
+    return [];
+  });
+  const [selectedStatus, setSelectedStatus] = useState<ImportStatus | "all">(
+    filters.statut || "all"
   );
-  const [selectedStatus, setSelectedStatus] = useState<ImportStatus | 'all'>(filters.statut || 'all');
-  const [selectedRegion, setSelectedRegion] = useState<string>(filters.codeRegion || 'all');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(filters.codeDepartement || 'all');
-  
+  const [selectedRegion, setSelectedRegion] = useState<string>(
+    filters.codeRegion || "all"
+  );
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(
+    filters.codeDepartement || "all"
+  );
+
   // Ref pour éviter les appels répétés
   const isInitialMount = useRef(true);
-  
+
   // Récupérer l'utilisateur connecté
   const { user } = useAuth();
 
-  // Filtrer les CELs selon l'utilisateur et préparer les options pour le MultiSelect
-  const getFilteredCels = () => {
-    if (user?.role?.code === 'USER') {
+  // ✅ CORRECTION : Utiliser useMemo pour mémoriser les CELs filtrées et éviter les recalculs
+  const baseCelsFiltered = useMemo(() => {
+    if (user?.role?.code === "USER") {
       // Pour les utilisateurs USER, ne montrer que leurs CELs attribuées
       if (user.cellules && user.cellules.length > 0) {
-        const userCelCodes = user.cellules.map(cel => cel.codeCellule);
-        return availableCels.filter(cel => userCelCodes.includes(cel.codeCellule));
+        // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
+        const userCelCodes = user.cellules.map((cel) => cel.COD_CEL);
+        return availableCels.filter((cel) =>
+          userCelCodes.includes(cel.codeCellule)
+        );
       } else {
         // Si l'utilisateur n'a pas de CELs attribuées, ne montrer aucune CEL
         return [];
@@ -62,189 +81,234 @@ export function ImportFilters({
     }
     // Pour ADMIN et SADMIN, montrer toutes les CELs
     return availableCels;
-  };
-
-  const baseCelsFiltered = getFilteredCels();
+  }, [user?.role?.code, user?.cellules, availableCels]);
 
   // ✨ NOUVEAU : Filtrer les CELs selon la région et/ou le département sélectionnés
-  const filteredCels = (() => {
+  const filteredCels = useMemo(() => {
     let celsToFilter = baseCelsFiltered;
 
     // Si un département est sélectionné, filtrer par département (le plus spécifique)
-    if (selectedDepartment !== 'all') {
+    if (selectedDepartment !== "all") {
       const celsInDepartment = new Set<string>();
-      
-      imports.forEach((importData: any) => {
+
+      imports.forEach((importData) => {
         if (importData.departement?.codeDepartement === selectedDepartment) {
           celsInDepartment.add(importData.codeCellule);
         }
       });
 
-      celsToFilter = celsToFilter.filter(cel => celsInDepartment.has(cel.codeCellule));
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 [ImportFilters] CELs filtrées par département:', {
-          departement: selectedDepartment,
-          count: celsToFilter.length
-        });
-      }
+      celsToFilter = celsToFilter.filter((cel) =>
+        celsInDepartment.has(cel.codeCellule)
+      );
     }
     // Sinon, si une région est sélectionnée, filtrer par région
-    else if (selectedRegion !== 'all') {
+    else if (selectedRegion !== "all") {
       const celsInRegion = new Set<string>();
-      
-      imports.forEach((importData: any) => {
+
+      imports.forEach((importData) => {
         if (importData.region?.codeRegion === selectedRegion) {
           celsInRegion.add(importData.codeCellule);
         }
       });
 
-      celsToFilter = celsToFilter.filter(cel => celsInRegion.has(cel.codeCellule));
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 [ImportFilters] CELs filtrées par région:', {
-          region: selectedRegion,
-          count: celsToFilter.length
-        });
-      }
+      celsToFilter = celsToFilter.filter((cel) =>
+        celsInRegion.has(cel.codeCellule)
+      );
     }
 
     return celsToFilter;
-  })();
+  }, [baseCelsFiltered, selectedDepartment, selectedRegion, imports]);
 
-  // ✨ NOUVEAU : Extraire les régions uniques des imports (selon permissions utilisateur)
-  const getAvailableRegionsFromImports = () => {
-    if (user?.role?.code === 'USER') {
+  // ✅ CORRECTION : Utiliser useMemo pour mémoriser les régions et départements
+  const filteredRegions = useMemo(() => {
+    if (user?.role?.code === "USER") {
       // Pour USER : Uniquement les régions des imports de ses CELs
-      const userCelCodes = user.cellules?.map(cel => cel.codeCellule) || [];
-      
+      // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
+      const userCelCodes = user.cellules?.map((cel) => cel.COD_CEL) || [];
+
       // Extraire les régions uniques des imports de l'utilisateur
       const uniqueRegions = new Map<string, string>();
-      
-      imports.forEach((importData: any) => {
+
+      imports.forEach((importData) => {
         // Vérifier si cet import appartient à une CEL de l'utilisateur
-        if (userCelCodes.includes(importData.codeCellule) && importData.region) {
-          uniqueRegions.set(importData.region.codeRegion, importData.region.libelleRegion);
+        if (
+          userCelCodes.includes(importData.codeCellule) &&
+          importData.region
+        ) {
+          uniqueRegions.set(
+            importData.region.codeRegion,
+            importData.region.libelleRegion
+          );
         }
       });
-      
+
       // Convertir en tableau et trier par libellé
       return Array.from(uniqueRegions.entries())
         .map(([codeRegion, libelleRegion]) => ({ codeRegion, libelleRegion }))
         .sort((a, b) => a.libelleRegion.localeCompare(b.libelleRegion));
     }
-    
+
     // Pour ADMIN et SADMIN : Toutes les régions
     return availableRegions;
-  };
+  }, [user?.role?.code, user?.cellules, imports, availableRegions]);
 
-  // ✨ NOUVEAU : Extraire les départements uniques des imports (selon permissions utilisateur)
-  const getAvailableDepartmentsFromImports = () => {
-    if (user?.role?.code === 'USER') {
+  const allFilteredDepartments = useMemo(() => {
+    if (user?.role?.code === "USER") {
       // Pour USER : Uniquement les départements des imports de ses CELs
-      const userCelCodes = user.cellules?.map(cel => cel.codeCellule) || [];
-      
+      // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
+      const userCelCodes = user.cellules?.map((cel) => cel.COD_CEL) || [];
+
       // Extraire les départements uniques des imports de l'utilisateur
-      const uniqueDepartments = new Map<string, { codeDepartement: string; libelleDepartement: string; codeRegion?: string }>();
-      
-      imports.forEach((importData: any) => {
+      const uniqueDepartments = new Map<
+        string,
+        {
+          codeDepartement: string;
+          libelleDepartement: string;
+          codeRegion?: string;
+        }
+      >();
+
+      imports.forEach((importData) => {
         // Vérifier si cet import appartient à une CEL de l'utilisateur
-        if (userCelCodes.includes(importData.codeCellule) && importData.departement) {
+        if (
+          userCelCodes.includes(importData.codeCellule) &&
+          importData.departement
+        ) {
           uniqueDepartments.set(importData.departement.codeDepartement, {
             codeDepartement: importData.departement.codeDepartement,
             libelleDepartement: importData.departement.libelleDepartement,
-            codeRegion: importData.region?.codeRegion // ✨ Inclure le code région
+            codeRegion: importData.region?.codeRegion, // ✨ Inclure le code région
           });
         }
       });
-      
+
       // Convertir en tableau et trier par libellé
-      return Array.from(uniqueDepartments.values())
-        .sort((a, b) => a.libelleDepartement.localeCompare(b.libelleDepartement));
+      return Array.from(uniqueDepartments.values()).sort((a, b) =>
+        a.libelleDepartement.localeCompare(b.libelleDepartement)
+      );
     }
-    
+
     // Pour ADMIN et SADMIN : Tous les départements
     return availableDepartments;
-  };
-
-  const filteredRegions = getAvailableRegionsFromImports();
-  const allFilteredDepartments = getAvailableDepartmentsFromImports();
+  }, [user?.role?.code, user?.cellules, imports, availableDepartments]);
 
   // ✨ NOUVEAU : Filtrer les départements selon la région sélectionnée
-  const filteredDepartments = (() => {
+  const filteredDepartments = useMemo(() => {
     // Si aucune région n'est sélectionnée, afficher tous les départements disponibles
-    if (selectedRegion === 'all') {
+    if (selectedRegion === "all") {
       return allFilteredDepartments;
     }
 
     // Si une région est sélectionnée, filtrer les départements de cette région
-    if (user?.role?.code === 'USER') {
+    if (user?.role?.code === "USER") {
       // Pour USER : Filtrer les départements de la région sélectionnée parmi ses imports
-      return allFilteredDepartments.filter((dept: any) => dept.codeRegion === selectedRegion);
+      // ✅ CORRECTION : Vérifier si codeRegion existe avant de filtrer
+      return allFilteredDepartments.filter(
+        (dept) => "codeRegion" in dept && dept.codeRegion === selectedRegion
+      );
     } else {
       // Pour ADMIN/SADMIN : Filtrer les départements de la région sélectionnée parmi tous les départements
       // On doit extraire cette info des imports
       const departementsDeRegion = new Set<string>();
-      
-      imports.forEach((importData: any) => {
-        if (importData.region?.codeRegion === selectedRegion && importData.departement) {
+
+      imports.forEach((importData) => {
+        if (
+          importData.region?.codeRegion === selectedRegion &&
+          importData.departement
+        ) {
           departementsDeRegion.add(importData.departement.codeDepartement);
         }
       });
 
-      return availableDepartments.filter(dept => departementsDeRegion.has(dept.codeDepartement));
+      return availableDepartments.filter((dept) =>
+        departementsDeRegion.has(dept.codeDepartement)
+      );
     }
-  })();
+  }, [
+    selectedRegion,
+    allFilteredDepartments,
+    user?.role?.code,
+    imports,
+    availableDepartments,
+  ]);
 
   // ✨ NOUVEAU : Réinitialiser le département quand la région change
   useEffect(() => {
     // Si "Toutes les régions" est sélectionnée et qu'un département spécifique est sélectionné
-    if (selectedRegion === 'all' && selectedDepartment !== 'all') {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 [ImportFilters] Réinitialisation du département (toutes les régions sélectionnées)');
+    if (selectedRegion === "all" && selectedDepartment !== "all") {
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log(
+          "🔄 [ImportFilters] Réinitialisation du département (toutes les régions sélectionnées)"
+        );
       }
-      setSelectedDepartment('all');
+      setSelectedDepartment("all");
     }
-    
+
     // Si une région spécifique est sélectionnée
-    if (selectedRegion !== 'all') {
+    if (selectedRegion !== "all") {
       // Vérifier si le département actuellement sélectionné appartient à cette région
       const departementValide = filteredDepartments.some(
-        dept => dept.codeDepartement === selectedDepartment
+        (dept) => dept.codeDepartement === selectedDepartment
       );
-      
+
       // Si le département sélectionné n'est pas dans la région, le réinitialiser
-      if (!departementValide && selectedDepartment !== 'all') {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔄 [ImportFilters] Réinitialisation du département (région changée)');
+      if (!departementValide && selectedDepartment !== "all") {
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.log(
+            "🔄 [ImportFilters] Réinitialisation du département (région changée)"
+          );
         }
-        setSelectedDepartment('all');
+        setSelectedDepartment("all");
       }
     }
   }, [selectedRegion, filteredDepartments, selectedDepartment]);
 
   // ✨ NOUVEAU : Décocher les CELs qui ne sont plus dans la zone géographique filtrée
   useEffect(() => {
-    if (selectedCels.length > 0 && (selectedRegion !== 'all' || selectedDepartment !== 'all')) {
+    if (
+      selectedCels.length > 0 &&
+      (selectedRegion !== "all" || selectedDepartment !== "all")
+    ) {
       // Vérifier si toutes les CELs sélectionnées sont toujours dans les CELs filtrées
-      const validCelCodes = new Set(filteredCels.map(cel => cel.codeCellule));
-      const invalidSelectedCels = selectedCels.filter(celCode => !validCelCodes.has(celCode));
-      
+      const validCelCodes = new Set(filteredCels.map((cel) => cel.codeCellule));
+      const invalidSelectedCels = selectedCels.filter(
+        (celCode) => !validCelCodes.has(celCode)
+      );
+
       if (invalidSelectedCels.length > 0) {
         // Retirer les CELs qui ne sont plus valides
-        const newSelectedCels = selectedCels.filter(celCode => validCelCodes.has(celCode));
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔄 [ImportFilters] Désélection des CELs hors zone:', {
+        const newSelectedCels = selectedCels.filter((celCode) =>
+          validCelCodes.has(celCode)
+        );
+
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.log("🔄 [ImportFilters] Désélection des CELs hors zone:", {
             invalidCels: invalidSelectedCels,
-            remainingCels: newSelectedCels
+            remainingCels: newSelectedCels,
           });
         }
-        
-        setSelectedCels(newSelectedCels);
+
+        // ✅ CORRECTION : Utiliser une fonction de mise à jour pour éviter la dépendance
+        setSelectedCels((prev) => {
+          const newCels = prev.filter((celCode) => validCelCodes.has(celCode));
+          // Ne mettre à jour que si quelque chose a changé
+          if (newCels.length !== prev.length) {
+            return newCels;
+          }
+          return prev;
+        });
       }
     }
-  }, [selectedRegion, selectedDepartment, filteredCels, selectedCels]);
+  }, [selectedRegion, selectedDepartment, filteredCels]); // ✅ Retirer selectedCels des dépendances
+
+  // ✅ CORRECTION : Mémoriser onFiltersChange avec useCallback ou utiliser une ref
+  const onFiltersChangeRef = useRef(onFiltersChange);
+  useEffect(() => {
+    onFiltersChangeRef.current = onFiltersChange;
+  }, [onFiltersChange]);
 
   // Appliquer les filtres avec debounce pour la recherche
   useEffect(() => {
@@ -258,50 +322,65 @@ export function ImportFilters({
       const newFilters = {
         page: 1, // Reset à la première page lors du filtrage
         limit: 10, // Valeur fixe pour éviter les dépendances
-        codeCellule: selectedCels.length > 0 ? selectedCels.join(',') : undefined, // CELs sélectionnées
-        statut: selectedStatus === 'all' ? undefined : selectedStatus,
-        codeRegion: selectedRegion === 'all' ? undefined : selectedRegion, // ✨ NOUVEAU
-        codeDepartement: selectedDepartment === 'all' ? undefined : selectedDepartment, // ✨ NOUVEAU
+        codeCellule:
+          selectedCels.length > 0 ? selectedCels.join(",") : undefined, // CELs sélectionnées
+        statut: selectedStatus === "all" ? undefined : selectedStatus,
+        codeRegion: selectedRegion === "all" ? undefined : selectedRegion, // ✨ NOUVEAU
+        codeDepartement:
+          selectedDepartment === "all" ? undefined : selectedDepartment, // ✨ NOUVEAU
       };
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 [ImportFilters] Application des filtres:', {
+
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log("🔍 [ImportFilters] Application des filtres:", {
           selectedCels,
           selectedStatus,
           selectedRegion,
           selectedDepartment,
           newFilters,
-          filteredCelsCount: filteredCels.length
+          filteredCelsCount: filteredCels.length,
         });
       }
-      
-      onFiltersChange(newFilters);
+
+      // ✅ CORRECTION : Utiliser la ref pour éviter la dépendance
+      onFiltersChangeRef.current?.(newFilters);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedCels, selectedStatus, selectedRegion, selectedDepartment, filteredCels.length]); // ✨ Ajout des nouvelles dépendances
+  }, [
+    selectedCels,
+    selectedStatus,
+    selectedRegion,
+    selectedDepartment,
+    filteredCels.length,
+    // ✅ CORRECTION : Retirer onFiltersChange des dépendances, utiliser la ref
+  ]);
 
   const clearFilters = () => {
     setSelectedCels([]);
-    setSelectedStatus('all');
-    setSelectedRegion('all');
-    setSelectedDepartment('all');
+    setSelectedStatus("all");
+    setSelectedRegion("all");
+    setSelectedDepartment("all");
     onFiltersChange({
       page: 1,
-      limit: 10
+      limit: 10,
     });
   };
 
-  const hasActiveFilters = selectedCels.length > 0 || selectedStatus !== 'all' || selectedRegion !== 'all' || selectedDepartment !== 'all';
-  
+  const hasActiveFilters =
+    selectedCels.length > 0 ||
+    selectedStatus !== "all" ||
+    selectedRegion !== "all" ||
+    selectedDepartment !== "all";
+
   const celOptions: MultiSelectOption[] = filteredCels.map((cel) => ({
     value: cel.codeCellule,
     label: cel.libelleCellule,
-    description: `Code: ${cel.codeCellule}`
+    description: `Code: ${cel.codeCellule}`,
   }));
 
   return (
-    <Card >
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Filter className="h-5 w-5" />
@@ -333,29 +412,37 @@ export function ImportFilters({
           <div className="space-y-2">
             <Label htmlFor="department-filter">
               Département
-              {selectedRegion !== 'all' && (
+              {selectedRegion !== "all" && (
                 <span className="ml-1 text-xs text-blue-600">
                   (filtré par région)
                 </span>
               )}
             </Label>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <Select
+              value={selectedDepartment}
+              onValueChange={setSelectedDepartment}
+            >
               <SelectTrigger>
-                <SelectValue placeholder={
-                  selectedRegion !== 'all' 
-                    ? `Départements de la région sélectionnée` 
-                    : "Tous les départements"
-                } />
+                <SelectValue
+                  placeholder={
+                    selectedRegion !== "all"
+                      ? `Départements de la région sélectionnée`
+                      : "Tous les départements"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">
-                  {selectedRegion !== 'all' 
-                    ? `Tous les départements de la région` 
+                  {selectedRegion !== "all"
+                    ? `Tous les départements de la région`
                     : "Tous les départements"}
                 </SelectItem>
                 {filteredDepartments.length > 0 ? (
                   filteredDepartments.map((dept) => (
-                    <SelectItem key={dept.codeDepartement} value={dept.codeDepartement}>
+                    <SelectItem
+                      key={dept.codeDepartement}
+                      value={dept.codeDepartement}
+                    >
                       {dept.libelleDepartement}
                     </SelectItem>
                   ))
@@ -372,11 +459,11 @@ export function ImportFilters({
           <div className="space-y-2">
             <Label htmlFor="cel-filter">
               Commission Électorale
-              {(selectedRegion !== 'all' || selectedDepartment !== 'all') && (
+              {(selectedRegion !== "all" || selectedDepartment !== "all") && (
                 <span className="ml-1 text-xs text-blue-600">
-                  {selectedDepartment !== 'all' 
-                    ? '(filtré par département)' 
-                    : '(filtré par région)'}
+                  {selectedDepartment !== "all"
+                    ? "(filtré par département)"
+                    : "(filtré par région)"}
                 </span>
               )}
             </Label>
@@ -385,46 +472,50 @@ export function ImportFilters({
               selected={selectedCels}
               onChange={setSelectedCels}
               placeholder={
-                selectedDepartment !== 'all' 
-                  ? "CELs du département sélectionné..." 
-                  : selectedRegion !== 'all'
-                    ? "CELs de la région sélectionnée..."
-                    : "Sélectionner les CELs..."
+                selectedDepartment !== "all"
+                  ? "CELs du département sélectionné..."
+                  : selectedRegion !== "all"
+                  ? "CELs de la région sélectionnée..."
+                  : "Sélectionner les CELs..."
               }
               searchPlaceholder="Rechercher une CEL..."
               emptyText={
-                (selectedRegion !== 'all' || selectedDepartment !== 'all')
+                selectedRegion !== "all" || selectedDepartment !== "all"
                   ? "Aucune CEL dans cette zone géographique."
-                  : user?.role?.code === 'USER' 
-                    ? "Aucune CEL attribuée à votre compte." 
-                    : "Aucune CEL trouvée."
+                  : user?.role?.code === "USER"
+                  ? "Aucune CEL attribuée à votre compte."
+                  : "Aucune CEL trouvée."
               }
               maxDisplay={2}
             />
-            
+
             {/* Message informatif */}
             <div className="text-xs text-muted-foreground">
-              {user?.role?.code === 'USER' ? (
+              {user?.role?.code === "USER" ? (
                 // Message pour USER
                 filteredCels.length > 0 ? (
                   <span className="text-blue-600">
-                    📋 {filteredCels.length} CEL{filteredCels.length > 1 ? 's' : ''} 
-                    {(selectedRegion !== 'all' || selectedDepartment !== 'all') 
-                      ? ' dans cette zone' 
-                      : ' attribuée' + (filteredCels.length > 1 ? 's' : '') + ' à votre compte'}
+                    📋 {filteredCels.length} CEL
+                    {filteredCels.length > 1 ? "s" : ""}
+                    {selectedRegion !== "all" || selectedDepartment !== "all"
+                      ? " dans cette zone"
+                      : " attribuée" +
+                        (filteredCels.length > 1 ? "s" : "") +
+                        " à votre compte"}
                   </span>
                 ) : (
                   <span className="text-orange-600">
-                    {(selectedRegion !== 'all' || selectedDepartment !== 'all')
-                      ? '⚠️ Aucune CEL attribuée dans cette zone.'
-                      : '⚠️ Aucune CEL n\'est attribuée à votre compte. Contactez votre administrateur.'}
+                    {selectedRegion !== "all" || selectedDepartment !== "all"
+                      ? "⚠️ Aucune CEL attribuée dans cette zone."
+                      : "⚠️ Aucune CEL n'est attribuée à votre compte. Contactez votre administrateur."}
                   </span>
                 )
               ) : (
                 // Message pour ADMIN/SADMIN
-                (selectedRegion !== 'all' || selectedDepartment !== 'all') && (
+                (selectedRegion !== "all" || selectedDepartment !== "all") && (
                   <span className="text-blue-600">
-                    📋 {filteredCels.length} CEL{filteredCels.length > 1 ? 's' : ''} dans cette zone
+                    📋 {filteredCels.length} CEL
+                    {filteredCels.length > 1 ? "s" : ""} dans cette zone
                   </span>
                 )
               )}
@@ -434,7 +525,12 @@ export function ImportFilters({
           {/* Filtre par statut */}
           <div className="space-y-2">
             <Label htmlFor="status-filter">Statut</Label>
-            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as ImportStatus | 'all')}>
+            <Select
+              value={selectedStatus}
+              onValueChange={(value) =>
+                setSelectedStatus(value as ImportStatus | "all")
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Tous les statuts" />
               </SelectTrigger>
@@ -453,23 +549,37 @@ export function ImportFilters({
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-sm text-muted-foreground">Filtres actifs:</span>
-                {selectedRegion && selectedRegion !== 'all' && (
+                <span className="text-sm text-muted-foreground">
+                  Filtres actifs:
+                </span>
+                {selectedRegion && selectedRegion !== "all" && (
                   <Badge variant="secondary" className="text-xs">
-                    Région: {filteredRegions.find(r => r.codeRegion === selectedRegion)?.libelleRegion || selectedRegion}
+                    Région:{" "}
+                    {filteredRegions.find(
+                      (r) => r.codeRegion === selectedRegion
+                    )?.libelleRegion || selectedRegion}
                   </Badge>
                 )}
-                {selectedDepartment && selectedDepartment !== 'all' && (
+                {selectedDepartment && selectedDepartment !== "all" && (
                   <Badge variant="secondary" className="text-xs">
-                    Dép.: {filteredDepartments.find(d => d.codeDepartement === selectedDepartment)?.libelleDepartement || selectedDepartment}
+                    Dép.:{" "}
+                    {filteredDepartments.find(
+                      (d) => d.codeDepartement === selectedDepartment
+                    )?.libelleDepartement || selectedDepartment}
                   </Badge>
                 )}
                 {selectedCels.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {selectedCels.slice(0, 3).map((celCode) => {
-                      const cel = filteredCels.find(c => c.codeCellule === celCode);
+                      const cel = filteredCels.find(
+                        (c) => c.codeCellule === celCode
+                      );
                       return (
-                        <Badge key={celCode} variant="secondary" className="text-xs">
+                        <Badge
+                          key={celCode}
+                          variant="secondary"
+                          className="text-xs"
+                        >
                           CEL: {cel?.libelleCellule || celCode}
                         </Badge>
                       );
@@ -481,11 +591,16 @@ export function ImportFilters({
                     )}
                   </div>
                 )}
-                {selectedStatus !== 'all' && (
+                {selectedStatus !== "all" && (
                   <Badge variant="secondary" className="text-xs">
-                    Statut: {selectedStatus === ImportStatus.N ? 'En attente' : 
-                             selectedStatus === ImportStatus.I ? 'Importé' : 
-                             selectedStatus === ImportStatus.P ? 'Publié' : selectedStatus}
+                    Statut:{" "}
+                    {selectedStatus === ImportStatus.N
+                      ? "En attente"
+                      : selectedStatus === ImportStatus.I
+                      ? "Importé"
+                      : selectedStatus === ImportStatus.P
+                      ? "Publié"
+                      : selectedStatus}
                   </Badge>
                 )}
               </div>
@@ -504,7 +619,7 @@ export function ImportFilters({
                 Effacer
               </Button>
             )}
-            
+
             {/* <Button
               variant="outline"
               size="sm"

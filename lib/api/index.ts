@@ -11,14 +11,14 @@ export { departementsApi } from './departements';
 
 // Services API pour l'upload
 export { uploadApi } from './upload';
-export type { 
-  ImportData, 
-  ImportListResponse, 
-  ImportStats, 
-  ImportFilters, 
+export type {
+  ImportData,
+  ImportListResponse,
+  ImportStats,
+  ImportFilters,
   UploadRequestParams,
   UploadResponse,
-  ImportStatus 
+  ImportStatus
 } from '@/types/upload';
 
 // Services API pour le dashboard
@@ -31,6 +31,14 @@ export type { User, UserListResponse, CreateUserData, UpdateUserData, UpdateProf
 // Services API pour les listes de formulaires
 export { listsApi } from './lists';
 export type { SimpleDepartement, SimpleCel, SimpleCirconscription, SimpleRegion } from './lists';
+
+// Services API pour les législatives
+export { legislativesApi } from './legislatives';
+export type {
+  LegislativesUploadResponse,
+  LegislativesUploadParams,
+  CelExcelDataResponse,
+} from '@/types/legislatives';
 
 // Services API pour les rôles
 export { rolesApi } from './roles';
