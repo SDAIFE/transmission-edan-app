@@ -91,7 +91,7 @@ export function Header() {
                 Résultats des Elections en Côte d’Ivoire
               </h1>
               <p className="text-sm text-green-600">
-                Commission Électorale Indépendante - Élection Présidentielle
+                Commission Électorale Indépendante - Élection Législatives
                 2025
               </p>
             </div>

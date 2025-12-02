@@ -130,9 +130,8 @@ export const uploadApi = {
         });
       }
       if (filters?.statut) queryParams.append("statut", filters.statut);
-      // ✨ NOUVEAU : Filtres géographiques
-      if (filters?.codeRegion) queryParams.append("codeRegion", filters.codeRegion);
-      if (filters?.codeDepartement) queryParams.append("codeDepartement", filters.codeDepartement);
+      // ✨ Filtre par circonscription
+      if (filters?.codeCirconscription) queryParams.append("codeCirconscription", filters.codeCirconscription);
 
       const queryString = queryParams.toString();
       const url = queryString
@@ -461,11 +460,32 @@ export const getStatusColor = (status: ImportStatus): string => {
 };
 
 // Fonction pour récupérer les détails d'une CEL
+// Endpoint: GET /api/v1/legislatives/upload/cel/:codeCellule/data
 export const getCelData = async (
   codeCellule: string
 ): Promise<CelDataResponse | null> => {
   try {
-    const response = await apiClient.get(`/upload/cel/${codeCellule}/data`);
+    if (process.env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console
+      console.log("🔍 [UploadAPI] Récupération des données CEL:", codeCellule);
+    }
+
+    // ✅ NOUVEAU ENDPOINT selon la documentation
+    const response = await apiClient.get(
+      `/legislatives/upload/cel/${codeCellule}/data`
+    );
+
+    if (process.env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console
+      console.log("✅ [UploadAPI] Données CEL récupérées:", {
+        codeCellule: response.data.codeCellule,
+        totalBureaux: response.data.totalBureaux,
+        nombreCandidats: Object.keys(response.data.data[0] || {}).filter(
+          (key) => key.startsWith("U-") || key.match(/^\d{2}-\d{5}$/)
+        ).length,
+      });
+    }
+
     return response.data;
   } catch (error: any) {
     console.error(
@@ -479,14 +499,15 @@ export const getCelData = async (
       code: error?.code,
     });
 
+    // Gestion des erreurs selon la documentation
     if (error?.response?.status === 404) {
-      throw new Error("CEL non trouvée");
+      throw new Error("CEL non trouvée ou aucun import réussi");
     } else if (error?.response?.status === 401) {
-      throw new Error("Token invalide");
+      throw new Error("Non authentifié. Veuillez vous reconnecter.");
     } else if (error?.response?.status === 403) {
-      throw new Error("Accès non autorisé");
+      throw new Error("Accès interdit. Cette CEL n'est pas accessible pour votre compte.");
     } else if (error?.response?.status === 500) {
-      throw new Error("Erreur serveur");
+      throw new Error("Erreur serveur. Veuillez réessayer plus tard.");
     }
 
     throw error;

@@ -110,7 +110,7 @@ class ElectionHeaderService {
       success: true,
       data: {
         id: electionId,
-        nom: 'Élection Présidentielle 2025 - Premier Tour',
+        nom: 'Élection Législatives 2025',
         date: '2025-10-25',
         type: 'presidential',
         tour: 1,

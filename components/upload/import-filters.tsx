@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,20 +19,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { ImportFiltersProps, ImportData } from "@/types/upload";
 
 interface ExtendedImportFiltersProps extends ImportFiltersProps {
-  availableRegions?: { codeRegion: string; libelleRegion: string }[];
-  availableDepartments?: {
-    codeDepartement: string;
-    libelleDepartement: string;
-  }[];
-  imports?: ImportData[]; // Pour extraire les régions/départements réellement présents
+  imports?: ImportData[]; // Pour extraire les circonscriptions réellement présentes
 }
 
 export function ImportFilters({
   filters,
   onFiltersChange,
   availableCels,
-  availableRegions = [],
-  availableDepartments = [],
   imports = [],
 }: ExtendedImportFiltersProps) {
   // ✅ CORRECTION : Gérer les CELs séparées par des virgules
@@ -51,12 +44,8 @@ export function ImportFilters({
   const [selectedStatus, setSelectedStatus] = useState<ImportStatus | "all">(
     filters.statut || "all"
   );
-  const [selectedRegion, setSelectedRegion] = useState<string>(
-    filters.codeRegion || "all"
-  );
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(
-    filters.codeDepartement || "all"
-  );
+  const [selectedCirconscription, setSelectedCirconscription] =
+    useState<string>(filters.codeCirconscription || "all");
 
   // Ref pour éviter les appels répétés
   const isInitialMount = useRef(true);
@@ -83,194 +72,78 @@ export function ImportFilters({
     return availableCels;
   }, [user?.role?.code, user?.cellules, availableCels]);
 
-  // ✨ NOUVEAU : Filtrer les CELs selon la région et/ou le département sélectionnés
+  // ✨ Filtrer les CELs selon la circonscription sélectionnée
   const filteredCels = useMemo(() => {
     let celsToFilter = baseCelsFiltered;
 
-    // Si un département est sélectionné, filtrer par département (le plus spécifique)
-    if (selectedDepartment !== "all") {
-      const celsInDepartment = new Set<string>();
+    // Si une circonscription est sélectionnée, filtrer par circonscription
+    if (selectedCirconscription !== "all") {
+      const celsInCirconscription = new Set<string>();
 
       imports.forEach((importData) => {
-        if (importData.departement?.codeDepartement === selectedDepartment) {
-          celsInDepartment.add(importData.codeCellule);
+        if (importData.codeCirconscription === selectedCirconscription) {
+          celsInCirconscription.add(importData.codeCellule);
         }
       });
 
       celsToFilter = celsToFilter.filter((cel) =>
-        celsInDepartment.has(cel.codeCellule)
-      );
-    }
-    // Sinon, si une région est sélectionnée, filtrer par région
-    else if (selectedRegion !== "all") {
-      const celsInRegion = new Set<string>();
-
-      imports.forEach((importData) => {
-        if (importData.region?.codeRegion === selectedRegion) {
-          celsInRegion.add(importData.codeCellule);
-        }
-      });
-
-      celsToFilter = celsToFilter.filter((cel) =>
-        celsInRegion.has(cel.codeCellule)
+        celsInCirconscription.has(cel.codeCellule)
       );
     }
 
     return celsToFilter;
-  }, [baseCelsFiltered, selectedDepartment, selectedRegion, imports]);
+  }, [baseCelsFiltered, selectedCirconscription, imports]);
 
-  // ✅ CORRECTION : Utiliser useMemo pour mémoriser les régions et départements
-  const filteredRegions = useMemo(() => {
+  // ✨ Extraire les circonscriptions uniques des imports
+  const availableCirconscriptions = useMemo(() => {
+    const uniqueCirconscriptions = new Map<string, string>();
+
     if (user?.role?.code === "USER") {
-      // Pour USER : Uniquement les régions des imports de ses CELs
-      // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
+      // Pour USER : Uniquement les circonscriptions des imports de ses CELs
       const userCelCodes = user.cellules?.map((cel) => cel.COD_CEL) || [];
-
-      // Extraire les régions uniques des imports de l'utilisateur
-      const uniqueRegions = new Map<string, string>();
 
       imports.forEach((importData) => {
         // Vérifier si cet import appartient à une CEL de l'utilisateur
         if (
           userCelCodes.includes(importData.codeCellule) &&
-          importData.region
+          importData.codeCirconscription &&
+          importData.libelleCirconscription
         ) {
-          uniqueRegions.set(
-            importData.region.codeRegion,
-            importData.region.libelleRegion
+          uniqueCirconscriptions.set(
+            importData.codeCirconscription,
+            importData.libelleCirconscription
           );
         }
       });
-
-      // Convertir en tableau et trier par libellé
-      return Array.from(uniqueRegions.entries())
-        .map(([codeRegion, libelleRegion]) => ({ codeRegion, libelleRegion }))
-        .sort((a, b) => a.libelleRegion.localeCompare(b.libelleRegion));
-    }
-
-    // Pour ADMIN et SADMIN : Toutes les régions
-    return availableRegions;
-  }, [user?.role?.code, user?.cellules, imports, availableRegions]);
-
-  const allFilteredDepartments = useMemo(() => {
-    if (user?.role?.code === "USER") {
-      // Pour USER : Uniquement les départements des imports de ses CELs
-      // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
-      const userCelCodes = user.cellules?.map((cel) => cel.COD_CEL) || [];
-
-      // Extraire les départements uniques des imports de l'utilisateur
-      const uniqueDepartments = new Map<
-        string,
-        {
-          codeDepartement: string;
-          libelleDepartement: string;
-          codeRegion?: string;
-        }
-      >();
-
-      imports.forEach((importData) => {
-        // Vérifier si cet import appartient à une CEL de l'utilisateur
-        if (
-          userCelCodes.includes(importData.codeCellule) &&
-          importData.departement
-        ) {
-          uniqueDepartments.set(importData.departement.codeDepartement, {
-            codeDepartement: importData.departement.codeDepartement,
-            libelleDepartement: importData.departement.libelleDepartement,
-            codeRegion: importData.region?.codeRegion, // ✨ Inclure le code région
-          });
-        }
-      });
-
-      // Convertir en tableau et trier par libellé
-      return Array.from(uniqueDepartments.values()).sort((a, b) =>
-        a.libelleDepartement.localeCompare(b.libelleDepartement)
-      );
-    }
-
-    // Pour ADMIN et SADMIN : Tous les départements
-    return availableDepartments;
-  }, [user?.role?.code, user?.cellules, imports, availableDepartments]);
-
-  // ✨ NOUVEAU : Filtrer les départements selon la région sélectionnée
-  const filteredDepartments = useMemo(() => {
-    // Si aucune région n'est sélectionnée, afficher tous les départements disponibles
-    if (selectedRegion === "all") {
-      return allFilteredDepartments;
-    }
-
-    // Si une région est sélectionnée, filtrer les départements de cette région
-    if (user?.role?.code === "USER") {
-      // Pour USER : Filtrer les départements de la région sélectionnée parmi ses imports
-      // ✅ CORRECTION : Vérifier si codeRegion existe avant de filtrer
-      return allFilteredDepartments.filter(
-        (dept) => "codeRegion" in dept && dept.codeRegion === selectedRegion
-      );
     } else {
-      // Pour ADMIN/SADMIN : Filtrer les départements de la région sélectionnée parmi tous les départements
-      // On doit extraire cette info des imports
-      const departementsDeRegion = new Set<string>();
-
+      // Pour ADMIN et SADMIN : Toutes les circonscriptions des imports
       imports.forEach((importData) => {
         if (
-          importData.region?.codeRegion === selectedRegion &&
-          importData.departement
+          importData.codeCirconscription &&
+          importData.libelleCirconscription
         ) {
-          departementsDeRegion.add(importData.departement.codeDepartement);
-        }
-      });
-
-      return availableDepartments.filter((dept) =>
-        departementsDeRegion.has(dept.codeDepartement)
-      );
-    }
-  }, [
-    selectedRegion,
-    allFilteredDepartments,
-    user?.role?.code,
-    imports,
-    availableDepartments,
-  ]);
-
-  // ✨ NOUVEAU : Réinitialiser le département quand la région change
-  useEffect(() => {
-    // Si "Toutes les régions" est sélectionnée et qu'un département spécifique est sélectionné
-    if (selectedRegion === "all" && selectedDepartment !== "all") {
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.log(
-          "🔄 [ImportFilters] Réinitialisation du département (toutes les régions sélectionnées)"
-        );
-      }
-      setSelectedDepartment("all");
-    }
-
-    // Si une région spécifique est sélectionnée
-    if (selectedRegion !== "all") {
-      // Vérifier si le département actuellement sélectionné appartient à cette région
-      const departementValide = filteredDepartments.some(
-        (dept) => dept.codeDepartement === selectedDepartment
-      );
-
-      // Si le département sélectionné n'est pas dans la région, le réinitialiser
-      if (!departementValide && selectedDepartment !== "all") {
-        if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
-          console.log(
-            "🔄 [ImportFilters] Réinitialisation du département (région changée)"
+          uniqueCirconscriptions.set(
+            importData.codeCirconscription,
+            importData.libelleCirconscription
           );
         }
-        setSelectedDepartment("all");
-      }
+      });
     }
-  }, [selectedRegion, filteredDepartments, selectedDepartment]);
 
-  // ✨ NOUVEAU : Décocher les CELs qui ne sont plus dans la zone géographique filtrée
+    // Convertir en tableau et trier par libellé
+    return Array.from(uniqueCirconscriptions.entries())
+      .map(([codeCirconscription, libelleCirconscription]) => ({
+        codeCirconscription,
+        libelleCirconscription,
+      }))
+      .sort((a, b) =>
+        a.libelleCirconscription.localeCompare(b.libelleCirconscription)
+      );
+  }, [user?.role?.code, user?.cellules, imports]);
+
+  // ✨ Décocher les CELs qui ne sont plus dans la circonscription filtrée
   useEffect(() => {
-    if (
-      selectedCels.length > 0 &&
-      (selectedRegion !== "all" || selectedDepartment !== "all")
-    ) {
+    if (selectedCels.length > 0 && selectedCirconscription !== "all") {
       // Vérifier si toutes les CELs sélectionnées sont toujours dans les CELs filtrées
       const validCelCodes = new Set(filteredCels.map((cel) => cel.codeCellule));
       const invalidSelectedCels = selectedCels.filter(
@@ -278,20 +151,17 @@ export function ImportFilters({
       );
 
       if (invalidSelectedCels.length > 0) {
-        // Retirer les CELs qui ne sont plus valides
-        const newSelectedCels = selectedCels.filter((celCode) =>
-          validCelCodes.has(celCode)
-        );
-
         if (process.env.NODE_ENV === "development") {
           // eslint-disable-next-line no-console
-          console.log("🔄 [ImportFilters] Désélection des CELs hors zone:", {
-            invalidCels: invalidSelectedCels,
-            remainingCels: newSelectedCels,
-          });
+          console.log(
+            "🔄 [ImportFilters] Désélection des CELs hors circonscription:",
+            {
+              invalidCels: invalidSelectedCels,
+            }
+          );
         }
 
-        // ✅ CORRECTION : Utiliser une fonction de mise à jour pour éviter la dépendance
+        // ✅ Utiliser une fonction de mise à jour pour éviter la dépendance
         setSelectedCels((prev) => {
           const newCels = prev.filter((celCode) => validCelCodes.has(celCode));
           // Ne mettre à jour que si quelque chose a changé
@@ -302,7 +172,8 @@ export function ImportFilters({
         });
       }
     }
-  }, [selectedRegion, selectedDepartment, filteredCels]); // ✅ Retirer selectedCels des dépendances
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCirconscription, filteredCels]); // selectedCels retiré intentionnellement car on utilise setSelectedCels avec fonction de mise à jour
 
   // ✅ CORRECTION : Mémoriser onFiltersChange avec useCallback ou utiliser une ref
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -325,9 +196,10 @@ export function ImportFilters({
         codeCellule:
           selectedCels.length > 0 ? selectedCels.join(",") : undefined, // CELs sélectionnées
         statut: selectedStatus === "all" ? undefined : selectedStatus,
-        codeRegion: selectedRegion === "all" ? undefined : selectedRegion, // ✨ NOUVEAU
-        codeDepartement:
-          selectedDepartment === "all" ? undefined : selectedDepartment, // ✨ NOUVEAU
+        codeCirconscription:
+          selectedCirconscription === "all"
+            ? undefined
+            : selectedCirconscription,
       };
 
       if (process.env.NODE_ENV === "development") {
@@ -335,8 +207,7 @@ export function ImportFilters({
         console.log("🔍 [ImportFilters] Application des filtres:", {
           selectedCels,
           selectedStatus,
-          selectedRegion,
-          selectedDepartment,
+          selectedCirconscription,
           newFilters,
           filteredCelsCount: filteredCels.length,
         });
@@ -350,8 +221,7 @@ export function ImportFilters({
   }, [
     selectedCels,
     selectedStatus,
-    selectedRegion,
-    selectedDepartment,
+    selectedCirconscription,
     filteredCels.length,
     // ✅ CORRECTION : Retirer onFiltersChange des dépendances, utiliser la ref
   ]);
@@ -359,8 +229,7 @@ export function ImportFilters({
   const clearFilters = () => {
     setSelectedCels([]);
     setSelectedStatus("all");
-    setSelectedRegion("all");
-    setSelectedDepartment("all");
+    setSelectedCirconscription("all");
     onFiltersChange({
       page: 1,
       limit: 10,
@@ -370,8 +239,7 @@ export function ImportFilters({
   const hasActiveFilters =
     selectedCels.length > 0 ||
     selectedStatus !== "all" ||
-    selectedRegion !== "all" ||
-    selectedDepartment !== "all";
+    selectedCirconscription !== "all";
 
   const celOptions: MultiSelectOption[] = filteredCels.map((cel) => ({
     value: cel.codeCellule,
@@ -389,68 +257,27 @@ export function ImportFilters({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filtres */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* ✨ NOUVEAU : Filtre par Région */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ✨ Filtre par Circonscription */}
           <div className="space-y-2">
-            <Label htmlFor="region-filter">Région</Label>
-            <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-              <SelectTrigger>
-                <SelectValue placeholder="Toutes les régions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les régions</SelectItem>
-                {filteredRegions.map((region) => (
-                  <SelectItem key={region.codeRegion} value={region.codeRegion}>
-                    {region.libelleRegion}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* ✨ NOUVEAU : Filtre par Département */}
-          <div className="space-y-2">
-            <Label htmlFor="department-filter">
-              Département
-              {selectedRegion !== "all" && (
-                <span className="ml-1 text-xs text-blue-600">
-                  (filtré par région)
-                </span>
-              )}
-            </Label>
+            <Label htmlFor="circonscription-filter">Circonscription</Label>
             <Select
-              value={selectedDepartment}
-              onValueChange={setSelectedDepartment}
+              value={selectedCirconscription}
+              onValueChange={setSelectedCirconscription}
             >
               <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    selectedRegion !== "all"
-                      ? `Départements de la région sélectionnée`
-                      : "Tous les départements"
-                  }
-                />
+                <SelectValue placeholder="Toutes les circonscriptions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">
-                  {selectedRegion !== "all"
-                    ? `Tous les départements de la région`
-                    : "Tous les départements"}
-                </SelectItem>
-                {filteredDepartments.length > 0 ? (
-                  filteredDepartments.map((dept) => (
-                    <SelectItem
-                      key={dept.codeDepartement}
-                      value={dept.codeDepartement}
-                    >
-                      {dept.libelleDepartement}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-2 text-sm text-muted-foreground text-center">
-                    Aucun département dans cette région
-                  </div>
-                )}
+                <SelectItem value="all">Toutes les circonscriptions</SelectItem>
+                {availableCirconscriptions.map((circonscription) => (
+                  <SelectItem
+                    key={circonscription.codeCirconscription}
+                    value={circonscription.codeCirconscription}
+                  >
+                    {circonscription.libelleCirconscription}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -459,11 +286,9 @@ export function ImportFilters({
           <div className="space-y-2">
             <Label htmlFor="cel-filter">
               Commission Électorale
-              {(selectedRegion !== "all" || selectedDepartment !== "all") && (
+              {selectedCirconscription !== "all" && (
                 <span className="ml-1 text-xs text-blue-600">
-                  {selectedDepartment !== "all"
-                    ? "(filtré par département)"
-                    : "(filtré par région)"}
+                  (filtré par circonscription)
                 </span>
               )}
             </Label>
@@ -472,16 +297,14 @@ export function ImportFilters({
               selected={selectedCels}
               onChange={setSelectedCels}
               placeholder={
-                selectedDepartment !== "all"
-                  ? "CELs du département sélectionné..."
-                  : selectedRegion !== "all"
-                  ? "CELs de la région sélectionnée..."
+                selectedCirconscription !== "all"
+                  ? "CELs de la circonscription sélectionnée..."
                   : "Sélectionner les CELs..."
               }
               searchPlaceholder="Rechercher une CEL..."
               emptyText={
-                selectedRegion !== "all" || selectedDepartment !== "all"
-                  ? "Aucune CEL dans cette zone géographique."
+                selectedCirconscription !== "all"
+                  ? "Aucune CEL dans cette circonscription."
                   : user?.role?.code === "USER"
                   ? "Aucune CEL attribuée à votre compte."
                   : "Aucune CEL trouvée."
@@ -497,25 +320,26 @@ export function ImportFilters({
                   <span className="text-blue-600">
                     📋 {filteredCels.length} CEL
                     {filteredCels.length > 1 ? "s" : ""}
-                    {selectedRegion !== "all" || selectedDepartment !== "all"
-                      ? " dans cette zone"
+                    {selectedCirconscription !== "all"
+                      ? " dans cette circonscription"
                       : " attribuée" +
                         (filteredCels.length > 1 ? "s" : "") +
                         " à votre compte"}
                   </span>
                 ) : (
                   <span className="text-orange-600">
-                    {selectedRegion !== "all" || selectedDepartment !== "all"
-                      ? "⚠️ Aucune CEL attribuée dans cette zone."
+                    {selectedCirconscription !== "all"
+                      ? "⚠️ Aucune CEL attribuée dans cette circonscription."
                       : "⚠️ Aucune CEL n'est attribuée à votre compte. Contactez votre administrateur."}
                   </span>
                 )
               ) : (
                 // Message pour ADMIN/SADMIN
-                (selectedRegion !== "all" || selectedDepartment !== "all") && (
+                selectedCirconscription !== "all" && (
                   <span className="text-blue-600">
                     📋 {filteredCels.length} CEL
-                    {filteredCels.length > 1 ? "s" : ""} dans cette zone
+                    {filteredCels.length > 1 ? "s" : ""} dans cette
+                    circonscription
                   </span>
                 )
               )}
@@ -523,7 +347,7 @@ export function ImportFilters({
           </div>
 
           {/* Filtre par statut */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label htmlFor="status-filter">Statut</Label>
             <Select
               value={selectedStatus}
@@ -541,7 +365,7 @@ export function ImportFilters({
                 <SelectItem value={ImportStatus.P}>Publié</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </div> */}
         </div>
 
         {/* Actions */}
@@ -552,22 +376,15 @@ export function ImportFilters({
                 <span className="text-sm text-muted-foreground">
                   Filtres actifs:
                 </span>
-                {selectedRegion && selectedRegion !== "all" && (
-                  <Badge variant="secondary" className="text-xs">
-                    Région:{" "}
-                    {filteredRegions.find(
-                      (r) => r.codeRegion === selectedRegion
-                    )?.libelleRegion || selectedRegion}
-                  </Badge>
-                )}
-                {selectedDepartment && selectedDepartment !== "all" && (
-                  <Badge variant="secondary" className="text-xs">
-                    Dép.:{" "}
-                    {filteredDepartments.find(
-                      (d) => d.codeDepartement === selectedDepartment
-                    )?.libelleDepartement || selectedDepartment}
-                  </Badge>
-                )}
+                {selectedCirconscription &&
+                  selectedCirconscription !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Circonscription:{" "}
+                      {availableCirconscriptions.find(
+                        (c) => c.codeCirconscription === selectedCirconscription
+                      )?.libelleCirconscription || selectedCirconscription}
+                    </Badge>
+                  )}
                 {selectedCels.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {selectedCels.slice(0, 3).map((celCode) => {

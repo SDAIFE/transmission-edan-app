@@ -1,16 +1,28 @@
-// Données skeleton pour les résultats électoraux
+/**
+ * Données skeleton pour les résultats électoraux
+ * 
+ * Ce fichier contient une structure de données complète mais vide (valeurs à zéro)
+ * utilisée pour le développement et les tests. Toutes les valeurs numériques sont
+ * initialisées à 0 pour représenter un état "en attente de résultats".
+ * 
+ * Structure:
+ * - Candidats avec leurs partis et résultats (tous à zéro)
+ * - Totaux nationaux (inscrits, votants, exprimes, etc.)
+ * - Statistiques de traitement des bureaux
+ * - Hiérarchie géographique: Régions > Départements > Lieux de vote > Bureaux
+ */
 import type { ElectionResults } from '@/types/results';
 
-// Données skeleton avec des valeurs neutres
+// Données skeleton avec des valeurs neutres (toutes à zéro)
 export const skeletonElectionResults: ElectionResults = {
   id: 'election-2025',
-  nom: 'Élection Présidentielle 2025 - Premier Tour',
+  nom: 'Élection Législatives 2025 - Premier Tour',
   date: '2025-10-25',
-  type: 'presidential',
+  type: 'legislative', // Corrigé: était 'presidential' mais le nom indique 'Législatives'
   tour: 1,
   status: 'preliminaires',
   lastUpdate: new Date().toISOString(),
-  
+
   candidates: [
     {
       id: 'cand-skeleton-1',
@@ -18,12 +30,12 @@ export const skeletonElectionResults: ElectionResults = {
       lastName: '1',
       fullName: 'Candidat 1',
       numero: 1,
-      photo: '/images/candidates/photo-alassane.jpg',
+      photo: '/images/candidates/placeholder.jpg', // Image placeholder pour le skeleton
       party: {
         id: 'party-skeleton-1',
         name: 'Parti Politique 1',
         sigle: 'PP1',
-        logo: '/images/candidates/logo-alassane.jpg',
+        logo: '/images/candidates/logo-placeholder.jpg', // Logo placeholder pour le skeleton
         color: '#FF6B35'
       },
       results: {
@@ -36,7 +48,7 @@ export const skeletonElectionResults: ElectionResults = {
       statistics: {
         totalExprimes: 0,
         voteShare: 0,
-        trend: 'stable' as const
+        trend: 'stable'
       }
     },
     {
@@ -45,12 +57,12 @@ export const skeletonElectionResults: ElectionResults = {
       lastName: '2',
       fullName: 'Candidat 2',
       numero: 2,
-      photo: '/images/candidates/photo-simone.jpg',
+      photo: '/images/candidates/placeholder.jpg', // Image placeholder pour le skeleton
       party: {
         id: 'party-skeleton-2',
         name: 'Parti Politique 2',
         sigle: 'PP2',
-        logo: '/images/candidates/logo-simone.png',
+        logo: '/images/candidates/logo-placeholder.png', // Logo placeholder pour le skeleton
         color: '#DC2626'
       },
       results: {
@@ -63,7 +75,7 @@ export const skeletonElectionResults: ElectionResults = {
       statistics: {
         totalExprimes: 0,
         voteShare: 0,
-        trend: 'stable' as const
+        trend: 'stable'
       }
     },
     {
@@ -72,12 +84,12 @@ export const skeletonElectionResults: ElectionResults = {
       lastName: '3',
       fullName: 'Candidat 3',
       numero: 3,
-      photo: '/images/candidates/photo-henriette.jpg',
+      photo: '/images/candidates/placeholder.jpg', // Image placeholder pour le skeleton
       party: {
         id: 'party-skeleton-3',
         name: 'Parti Politique 3',
         sigle: 'PP3',
-        logo: '/images/candidates/logo-henriette.jpg',
+        logo: '/images/candidates/logo-placeholder.jpg', // Logo placeholder pour le skeleton
         color: '#1E40AF'
       },
       results: {
@@ -90,11 +102,11 @@ export const skeletonElectionResults: ElectionResults = {
       statistics: {
         totalExprimes: 0,
         voteShare: 0,
-        trend: 'stable' as const
+        trend: 'stable'
       }
     }
   ],
-  
+
   totals: {
     inscrits: 0,
     inscritsHommes: 0,
@@ -124,7 +136,7 @@ export const skeletonElectionResults: ElectionResults = {
       }
     ]
   },
-  
+
   statistics: {
     bureauTraites: 0,
     bureauTotal: 0,
@@ -147,7 +159,7 @@ export const skeletonElectionResults: ElectionResults = {
       }
     ]
   },
-  
+
   regions: [
     {
       id: 'region-skeleton-1',
@@ -228,7 +240,7 @@ export const skeletonElectionResults: ElectionResults = {
       }
     }
   ],
-  
+
   departementsPublies: [
     'Département 1',
     'Département 2',

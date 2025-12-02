@@ -29,7 +29,7 @@ export function UserDashboardContent({ user }: UserDashboardContentProps) {
           value: userMetrics.celsAvecImport ?? 0,
           icon: CheckCircle,
           color: "text-green-600",
-          subtitle: `Taux: ${(userMetrics.tauxProgression ?? 0).toFixed(1)}%`,
+         // subtitle: `Taux: ${(userMetrics.tauxProgression ?? 0).toFixed(1)}%`,
         },
         {
           label: "CELs sans Import",

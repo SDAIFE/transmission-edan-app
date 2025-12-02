@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -35,13 +34,9 @@ import {
   FileSpreadsheet,
   Calendar,
   Hash,
-  AlertTriangle,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { formatFileSize } from "@/lib/api/upload";
-import { ImportStatusBadge, ImportStatusDetails } from "./import-status-badge";
 import { CelDetailsModal } from "./cel-details-modal";
 import type { ImportsTableProps, ImportData } from "@/types/upload";
 
@@ -88,29 +83,6 @@ export function ImportsTable({
     });
   };
 
-  const isDataConsistent = (importData: any) => {
-    const lignes = importData.nombreLignesImportees || 0;
-    const bureaux = importData.nombreBureauxVote || 0;
-    return lignes === bureaux;
-  };
-
-  const getInconsistencyTooltip = (importData: any) => {
-    const lignes = importData.nombreLignesImportees || 0;
-    const bureaux = importData.nombreBureauxVote || 0;
-    const difference = Math.abs(lignes - bureaux);
-
-    if (lignes > bureaux) {
-      return `${difference} ligne${
-        difference > 1 ? "s" : ""
-      } en trop (${lignes} lignes vs ${bureaux} bureaux)`;
-    } else if (bureaux > lignes) {
-      return `${difference} bureau${difference > 1 ? "x" : ""} manquant${
-        difference > 1 ? "s" : ""
-      } (${lignes} lignes vs ${bureaux} bureaux)`;
-    }
-    return "";
-  };
-
   const handleAction = (action: () => void, importId: string) => {
     setSelectedImport(importId);
     action();
@@ -131,8 +103,6 @@ export function ImportsTable({
     setSelectedImportData(null);
   };
 
-console.log ("Imports", imports);
-  
   if (loading) {
     return (
       <Card>
@@ -173,19 +143,6 @@ console.log ("Imports", imports);
             <CardDescription>
               {imports.length} feuille{imports.length > 1 ? "s" : ""} Excel au
               total
-              {imports.filter((imp) => !isDataConsistent(imp)).length > 0 && (
-                <span className="text-orange-600 font-medium ml-2">
-                  • {imports.filter((imp) => !isDataConsistent(imp)).length}{" "}
-                  incohérence
-                  {imports.filter((imp) => !isDataConsistent(imp)).length > 1
-                    ? "s"
-                    : ""}{" "}
-                  détectée
-                  {imports.filter((imp) => !isDataConsistent(imp)).length > 1
-                    ? "s"
-                    : ""}
-                </span>
-              )}
             </CardDescription>
           </div>
           {onRefresh && (
@@ -194,18 +151,6 @@ console.log ("Imports", imports);
               Actualiser
             </Button>
           )}
-        </div>
-
-        {/* Légende des indicateurs */}
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <CheckCircle className="h-3 w-3 text-green-500" />
-            <span>Données cohérentes</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-orange-500" />
-            <span>Incohérence détectée</span>
-          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -222,14 +167,10 @@ console.log ("Imports", imports);
             <TableHeader>
               <TableRow>
                 <TableHead>CEL</TableHead>
+                <TableHead>Circonscription</TableHead>
                 <TableHead>Utilisateur</TableHead>
-                <TableHead>Région</TableHead>
-                <TableHead>Département</TableHead>
-                <TableHead>Statut</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Bv</TableHead>
-                <TableHead>Lignes</TableHead>
-
+                <TableHead>Bureaux</TableHead>
                 <TableHead className="w-[50px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -238,99 +179,61 @@ console.log ("Imports", imports);
                 <TableRow
                   key={
                     importData.id ||
-                    `import-${index}-${importData.codeCellule}-${importData.dateImport}`
+                    `import-${index}-${importData.codeCellule}-${importData.dateDernierImport}`
                   }
                   className={`${
                     selectedImport === importData.id ? "bg-muted/50" : ""
-                  } ${
-                    !isDataConsistent(importData)
-                      ? "hover:bg-orange-50/50 bg-orange-50/30"
-                      : ""
                   }`}
-                  title={
-                    !isDataConsistent(importData)
-                      ? getInconsistencyTooltip(importData)
-                      : undefined
-                  }
                 >
-                  
-                  {/* Nom du fichier */}
-                  <TableCell
-                    className={
-                      !isDataConsistent(importData)
-                        ? "border-l-4 border-l-orange-400 pl-3"
-                        : ""
-                    }
-                  >
+                  {/* CEL */}
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet className="h-4 w-4 text-blue-600" />
                       <div>
                         <div className="font-medium text-sm">
-                          {importData.nomFichier}{" "}
-                          {/* libelleCellule dans la réponse backend */}
+                          {importData.libelleCellule}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatFileSize(importData.nomFichier.length * 1000)}{" "}
-                          {/* Estimation */}
+                          {importData.codeCellule} • {importData.nomFichier}
                         </div>
                       </div>
                     </div>
                   </TableCell>
 
-                  {/* ✨ NOUVEAU : Utilisateur (nom, prénoms) */}
+                  {/* Circonscription */}
                   <TableCell>
-                    {importData.importePar ? (
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">
+                        {importData.libelleCirconscription}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {importData.codeCirconscription}
+                      </span>
+                    </div>
+                  </TableCell>
+
+                  {/* Utilisateur */}
+                  <TableCell>
+                    {importData.utilisateurAssign ? (
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">
-                          {importData.importePar.nom}
+                          {importData.utilisateurAssign.firstName}{" "}
+                          {importData.utilisateurAssign.lastName}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {importData.importePar.prenom}
+                          {importData.utilisateurAssign.email}
                         </span>
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
-                  </TableCell>
-
-                  {/* ✨ NOUVEAU : Région */}
-                  <TableCell>
-                    {importData.region ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-blue-50 border-blue-200"
-                      >
-                        {importData.region.libelleRegion}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-
-                  {/* ✨ NOUVEAU : Département */}
-                  <TableCell>
-                    {importData.departement ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-green-50 border-green-200"
-                      >
-                        {importData.departement.libelleDepartement}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-
-                  {/* Statut */}
-                  <TableCell>
-                    <ImportStatusBadge status={importData.statutImport} />
                   </TableCell>
 
                   {/* Date */}
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
-                      {formatDate(importData.dateImport)}
+                      {formatDate(importData.dateDernierImport)}
                     </div>
                   </TableCell>
 
@@ -343,36 +246,6 @@ console.log ("Imports", imports);
                         <span className="text-yellow-600 text-xs">
                           (aucune donnée)
                         </span>
-                      )}
-                      {isDataConsistent(importData) &&
-                        (importData.nombreLignesImportees > 0 ||
-                          importData.nombreBureauxVote > 0) && (
-                          <div title="Données cohérentes">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                          </div>
-                        )}
-                    </div>
-                  </TableCell>
-
-                  {/* Nombre de lignes */}
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm">
-                      <Hash className="h-3 w-3 text-muted-foreground" />
-                      <span>{importData.nombreLignesImportees || 0}</span>
-                      {importData.nombreLignesEnErreur > 0 && (
-                        <span className="text-red-600 text-xs">
-                          ({importData.nombreLignesEnErreur} erreurs)
-                        </span>
-                      )}
-                      {importData.nombreLignesImportees === 0 && (
-                        <span className="text-yellow-600 text-xs">
-                          (aucune donnée)
-                        </span>
-                      )}
-                      {!isDataConsistent(importData) && (
-                        <div title={getInconsistencyTooltip(importData)}>
-                          <AlertTriangle className="h-3 w-3 text-orange-500" />
-                        </div>
                       )}
                     </div>
                   </TableCell>
@@ -393,7 +266,7 @@ console.log ("Imports", imports);
                           onClick={() =>
                             handleAction(
                               () => handleViewDetails(importData),
-                              importData.id
+                              importData.id || ""
                             )
                           }
                         >
@@ -406,7 +279,7 @@ console.log ("Imports", imports);
                             onClick={() =>
                               handleAction(
                                 () => onDownload(importData),
-                                importData.id
+                                importData.id || ""
                               )
                             }
                           >
@@ -423,7 +296,7 @@ console.log ("Imports", imports);
                             onClick={() =>
                               handleAction(
                                 () => onDelete(importData),
-                                importData.id
+                                importData.id || ""
                               )
                             }
                           >

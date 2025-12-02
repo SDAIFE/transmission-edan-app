@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,10 +27,7 @@ import { Table, TableColumnsType } from "antd";
 import {
   X,
   Building2,
-  Users,
-  TrendingUp,
   FileSpreadsheet,
-  Calendar,
   Hash,
   AlertCircle,
   CheckCircle,
@@ -42,12 +39,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { getCelData } from "@/lib/api/upload";
-import type {
-  CelDataResponse,
-  CelData,
-  CelMetrics,
-  ImportData,
-} from "@/types/upload";
+import type { CelDataResponse, CelData, ImportData } from "@/types/upload";
 
 // Styles personnalisés pour le tableau
 const tableStyles = `
@@ -135,13 +127,17 @@ export function CelDetailsModal({
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
-  
+
   // États pour l'upload de fichier signé
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error' | null; text: string }>({ type: null, text: '' });
+  const [uploadMessage, setUploadMessage] = useState<{
+    type: "success" | "error" | null;
+    text: string;
+  }>({ type: null, text: "" });
 
+  // Fonction pour charger les données CEL
   const loadCelData = async () => {
     if (!importData) return;
 
@@ -149,11 +145,18 @@ export function CelDetailsModal({
       setLoading(true);
       setError(null);
       const data = await getCelData(importData.codeCellule);
-      console.log('🔍 [CEL Details Modal] Données CEL chargées:', data);
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log("🔍 [CEL Details Modal] Données CEL chargées:", data);
+      }
       setCelData(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erreur lors du chargement des données";
       console.error("Erreur lors du chargement des données CEL:", err);
-      setError(err.message || "Erreur lors du chargement des données");
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -163,7 +166,8 @@ export function CelDetailsModal({
     if (isOpen && importData) {
       loadCelData();
     }
-  }, [isOpen, importData]); // Supprimé loadCelData des dépendances
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, importData]);
 
   useEffect(() => {
     if (celData) {
@@ -189,83 +193,217 @@ export function CelDetailsModal({
     };
   }, []);
 
+  // ✅ Extraire les colonnes de candidats dynamiquement selon la documentation
+  const candidateColumns = useMemo(() => {
+    if (!celData?.data || celData.data.length === 0) return [];
+
+    // Extraire les clés qui correspondent aux NUM_DOS des candidats
+    // Format: "U-02108", "U-02122", etc. ou "XX-XXXXX" (selon la doc)
+    const firstRow = celData.data[0];
+    return Object.keys(firstRow).filter(
+      (key) => key.startsWith("U-") || key.match(/^\d{2}-\d{5}$/) !== null
+    );
+  }, [celData]);
+
   const formatNumber = (value: string | number): string => {
-    const num = typeof value === "string" ? parseInt(value) || 0 : value;
+    const num = typeof value === "string" ? parseFloat(value) || 0 : value;
     return num.toLocaleString("fr-FR");
   };
 
   const formatNumberForPDF = (value: string | number): string => {
-    const num = typeof value === "string" ? parseInt(value) || 0 : value;
+    const num = typeof value === "string" ? parseFloat(value) || 0 : value;
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   };
 
-  const formatPercentage = (value: string): string => {
-    return value.includes("%") ? value : `${value}%`;
+  const formatPercentage = (value: string | number): string => {
+    const num = typeof value === "string" ? parseFloat(value) || 0 : value;
+    return num.toFixed(2).includes("%") ? num.toString() : `${num.toFixed(2)}%`;
   };
 
   // Gestion de l'upload de fichier signé
   const handleUploadClick = () => {
     setShowUploadDialog(true);
-    setUploadMessage({ type: null, text: '' });
+    setUploadMessage({ type: null, text: "" });
     setSelectedFile(null);
   };
 
   const handleCloseUploadDialog = () => {
     setShowUploadDialog(false);
-    setUploadMessage({ type: null, text: '' });
+    setUploadMessage({ type: null, text: "" });
     setSelectedFile(null);
   };
 
+  // ✅ Validation du fichier avant upload (selon la documentation)
+  const validateFile = (
+    file: File,
+    codeCel: string
+  ): { valid: boolean; error?: string } => {
+    // Vérifier le code CEL
+    if (!codeCel || codeCel.trim() === "") {
+      return { valid: false, error: "Le code CEL est requis" };
+    }
+
+    // Vérifier le type de fichier
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      return {
+        valid: false,
+        error: "Type de fichier invalide. Types autorisés : PDF, JPG, PNG",
+      };
+    }
+
+    // Vérifier l'extension
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const allowedExtensions = ["pdf", "jpg", "jpeg", "png"];
+    if (!extension || !allowedExtensions.includes(extension)) {
+      return {
+        valid: false,
+        error:
+          "Extension de fichier invalide. Extensions autorisées : pdf, jpg, jpeg, png",
+      };
+    }
+
+    // Vérifier la taille (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: `Le fichier est trop volumineux. Taille maximale : 10MB. Taille actuelle : ${(
+          file.size /
+          1024 /
+          1024
+        ).toFixed(2)}MB`,
+      };
+    }
+
+    return { valid: true };
+  };
+
+  // ✅ Upload de fichier signé selon la documentation
   const handleFileUpload = async () => {
     if (!selectedFile || !importData || uploadLoading) return;
 
     try {
       setUploadLoading(true);
-      setUploadMessage({ type: null, text: '' });
-      
+      setUploadMessage({ type: null, text: "" });
+
+      // ✅ Validation du fichier avant upload
+      const validation = validateFile(selectedFile, importData.codeCellule);
+      if (!validation.valid) {
+        setUploadMessage({
+          type: "error",
+          text: validation.error || "Erreur de validation",
+        });
+        toast.error("Erreur de validation", {
+          description: validation.error,
+          duration: 5000,
+        });
+        setUploadLoading(false);
+        return;
+      }
+
       // ✅ SÉCURITÉ : Vérifier le token avant l'upload
-      const { ensureValidToken } = await import('@/lib/utils/session-helper');
+      const { ensureValidToken } = await import("@/lib/utils/session-helper");
       const tokenCheck = await ensureValidToken();
-      
+
       if (!tokenCheck.isValid) {
-        toast.error(tokenCheck.message || 'Session expirée. Veuillez vous reconnecter.');
+        toast.error(
+          tokenCheck.message || "Session expirée. Veuillez vous reconnecter."
+        );
         setTimeout(() => {
-          window.location.href = '/auth/login?redirect=/upload&reason=session_expired';
+          window.location.href =
+            "/auth/login?redirect=/upload&reason=session_expired";
         }, 2000);
         return;
       }
-      
+
+      // ✅ Construire FormData selon la documentation
       const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('celId', importData.codeCellule);
-      formData.append('celCode', importData.codeCellule);
+      formData.append("signedFile", selectedFile); // ✅ Nom correct selon la doc
+      formData.append("codeCel", importData.codeCellule); // ✅ Nom correct selon la doc
 
-      // ✅ Envoyer directement au backend NestJS (au lieu de l'API Next.js locale)
-      const { uploadClient } = await import('@/lib/api/client');
-      const response = await uploadClient.post('/upload/cels', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // ✅ Ajouter codCe (code circonscription) si disponible
+      if (importData.codeCirconscription) {
+        formData.append("codCe", importData.codeCirconscription);
+      }
 
-      const result = response.data;
-      
-      console.log('✅ Fichier CEL signé uploadé avec succès:', {
-        file: selectedFile.name,
-        cel: importData.nomFichier,
-        size: selectedFile.size,
-        result
-      });
+      // ✅ Ajouter importId si disponible (optionnel)
+      if (importData.id) {
+        formData.append("importId", importData.id.toString());
+      }
 
-      // Message de succès
-      setUploadMessage({ 
-        type: 'success', 
-        text: `Fichier "${selectedFile.name}" uploadé avec succès pour la CEL ${importData.nomFichier}` 
+      // ✅ Ajouter description optionnelle
+      const description = `Procès-verbal signé de la CEL ${importData.codeCellule}`;
+      formData.append("description", description);
+
+      // ✅ Envoyer directement au backend NestJS
+      const { uploadClient } = await import("@/lib/api/client");
+      const response = await uploadClient.post(
+        "legislatives/upload/signed-file",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // ✅ Réponse selon la documentation : SignedFileUploadResponse
+      const result = response.data as {
+        id: number;
+        codeCel: string;
+        codCe: string;
+        signedFilePath: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
+        uploadedBy: {
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+        };
+        uploadedAt: string;
+        downloadUrl: string;
+      };
+
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log("✅ Fichier CEL signé uploadé avec succès:", {
+          file: selectedFile.name,
+          cel: importData.codeCellule,
+          size: selectedFile.size,
+          result,
+          downloadUrl: result.downloadUrl,
+          uploadedAt: result.uploadedAt,
+        });
+      }
+
+      // Message de succès avec informations de la réponse
+      const uploadedDate = new Date(result.uploadedAt).toLocaleString("fr-FR");
+      setUploadMessage({
+        type: "success",
+        text: `Fichier "${
+          result.fileName || selectedFile.name
+        }" uploadé avec succès pour la CEL ${
+          importData.libelleCellule
+        } le ${uploadedDate}`,
       });
 
       // Afficher le toast de succès
-      toast.success('Fichier CEL signé uploadé avec succès', {
-        description: `Le fichier "${selectedFile.name}" a été uploadé pour la CEL ${importData.nomFichier}`,
+      toast.success("Fichier CEL signé uploadé avec succès", {
+        description: `Le fichier "${result.fileName || selectedFile.name}" (${(
+          result.fileSize /
+          1024 /
+          1024
+        ).toFixed(2)} MB) a été uploadé pour la CEL ${
+          importData.libelleCellule
+        }`,
         duration: 5000,
       });
 
@@ -273,22 +411,70 @@ export function CelDetailsModal({
       setTimeout(() => {
         setShowUploadDialog(false);
         setSelectedFile(null);
-        setUploadMessage({ type: null, text: '' });
+        setUploadMessage({ type: null, text: "" });
       }, 2000);
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'upload:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Une erreur inattendue s\'est produite';
-      
+    } catch (error: any) {
+      console.error("❌ Erreur lors de l'upload:", error);
+
+      // ✅ Gestion détaillée des erreurs selon la documentation
+      let errorMessage = "Une erreur inattendue s'est produite";
+      let errorTitle = "Erreur lors de l'upload";
+
+      if (error?.response) {
+        const status = error.response.status;
+        const message = error.response.data?.message || "Erreur inconnue";
+
+        switch (status) {
+          case 400:
+            // Fichier invalide ou données manquantes
+            errorTitle = "Erreur de validation";
+            errorMessage = `Erreur de validation : ${message}`;
+            break;
+
+          case 401:
+            // Token expiré
+            errorTitle = "Session expirée";
+            errorMessage = "Votre session a expiré. Veuillez vous reconnecter.";
+            toast.error(errorTitle, {
+              description: errorMessage,
+              duration: 5000,
+            });
+            setTimeout(() => {
+              window.location.href =
+                "/auth/login?redirect=/upload&reason=session_expired";
+            }, 2000);
+            setUploadLoading(false);
+            return;
+
+          case 403:
+            // Accès refusé à la CEL
+            errorTitle = "Accès interdit";
+            errorMessage = "Vous n'avez pas accès à cette cellule électorale.";
+            break;
+
+          case 404:
+            // CEL ou import non trouvé
+            errorTitle = "Ressource non trouvée";
+            errorMessage = `Ressource non trouvée : ${message}`;
+            break;
+
+          default:
+            // Erreur serveur ou réseau
+            errorTitle = "Erreur serveur";
+            errorMessage = `Erreur lors de l'upload. Veuillez réessayer. (${message})`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       // Message d'erreur
-      setUploadMessage({ 
-        type: 'error', 
-        text: `Erreur lors de l'upload: ${errorMessage}` 
+      setUploadMessage({
+        type: "error",
+        text: `${errorTitle}: ${errorMessage}`,
       });
 
       // Afficher le toast d'erreur
-      toast.error('Erreur lors de l\'upload', {
+      toast.error(errorTitle, {
         description: errorMessage,
         duration: 5000,
       });
@@ -298,16 +484,16 @@ export function CelDetailsModal({
   };
 
   // Configuration des colonnes Ant Design avec en-têtes multi-niveaux
-  const columns: TableColumnsType<CelData> = useMemo(
-    () => [
+  const columns: TableColumnsType<CelData> = useMemo(() => {
+    const baseColumns: TableColumnsType<CelData> = [
       {
         title: "ORD",
         dataIndex: "ordre",
         key: "ordre",
         width: 60,
         align: "center",
-        render: (value: string, record: CelData) =>
-          record.id === "totals" ? (
+        render: (value: number | string, record: CelData) =>
+          String(record.id) === "totals" ? (
             <Badge variant="default" className="text-sm bg-green-600 font-bold">
               {value}
             </Badge>
@@ -323,7 +509,7 @@ export function CelDetailsModal({
         key: "libelleLieuVote",
         width: 200,
         render: (value: string, record: CelData) =>
-          record.id === "totals" ? (
+          String(record.id) === "totals" ? (
             <div className="font-bold text-sm ">{value}</div>
           ) : (
             <div>
@@ -334,9 +520,9 @@ export function CelDetailsModal({
             </div>
           ),
         onCell: (record: CelData) => {
-          if (record.id === "totals") {
+          if (String(record.id) === "totals") {
             return {
-              colSpan: 1, // Ne s'étend plus, affiche seulement le lieu de vote
+              colSpan: 1,
             };
           }
           return {};
@@ -349,7 +535,7 @@ export function CelDetailsModal({
         width: 80,
         align: "center",
         render: (value: string, record: CelData) =>
-          record.id === "totals" ? (
+          String(record.id) === "totals" ? (
             <Badge variant="default" className="text-sm bg-green-600 font-bold">
               {celData?.totalBureaux || 0}
             </Badge>
@@ -368,10 +554,10 @@ export function CelDetailsModal({
             key: "populationHommes",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -384,10 +570,10 @@ export function CelDetailsModal({
             key: "populationFemmes",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -400,10 +586,10 @@ export function CelDetailsModal({
             key: "populationTotale",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`font-bold text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -411,20 +597,6 @@ export function CelDetailsModal({
             ),
           },
         ],
-      },
-      {
-        title: "PERS. ASTREINTE",
-        dataIndex: "personnesAstreintes",
-        key: "personnesAstreintes",
-        width: 120,
-        align: "center",
-        render: (value: string, record: CelData) => (
-          <div
-            className={`text-sm ${record.id === "totals" ? " font-bold" : ""}`}
-          >
-            {formatNumber(value || "0")}
-          </div>
-        ),
       },
       {
         title: "VOTANTS",
@@ -435,10 +607,10 @@ export function CelDetailsModal({
             key: "votantsHommes",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -451,10 +623,10 @@ export function CelDetailsModal({
             key: "votantsFemmes",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -467,10 +639,10 @@ export function CelDetailsModal({
             key: "totalVotants",
             width: 80,
             align: "center",
-            render: (value: string, record: CelData) => (
+            render: (value: number | string, record: CelData) => (
               <div
                 className={`font-bold text-sm ${
-                  record.id === "totals" ? " font-bold" : ""
+                  String(record.id) === "totals" ? " font-bold" : ""
                 }`}
               >
                 {formatNumber(value)}
@@ -485,10 +657,10 @@ export function CelDetailsModal({
         key: "tauxParticipation",
         width: 120,
         align: "center",
-        render: (value: string, record: CelData) => (
+        render: (value: number | string, record: CelData) => (
           <div
             className={`text-sm font-medium ${
-              record.id === "totals" ? " font-bold" : ""
+              String(record.id) === "totals" ? " font-bold" : ""
             }`}
           >
             {formatPercentage(value)}
@@ -501,9 +673,11 @@ export function CelDetailsModal({
         key: "bulletinsNuls",
         width: 100,
         align: "center",
-        render: (value: string, record: CelData) => (
+        render: (value: number | string, record: CelData) => (
           <div
-            className={`text-sm ${record.id === "totals" ? " font-bold" : ""}`}
+            className={`text-sm ${
+              String(record.id) === "totals" ? " font-bold" : ""
+            }`}
           >
             {formatNumber(value)}
           </div>
@@ -515,23 +689,35 @@ export function CelDetailsModal({
         key: "suffrageExprime",
         width: 120,
         align: "center",
-        render: (value: string, record: CelData) => (
+        render: (value: number | string, record: CelData) => (
           <div
-            className={`text-sm ${record.id === "totals" ? " font-bold" : ""}`}
+            className={`text-sm ${
+              String(record.id) === "totals" ? " font-bold" : ""
+            }`}
           >
-            <div className={`font-medium ${record.id === "totals" ? "" : ""}`}>
+            <div
+              className={`font-medium ${
+                String(record.id) === "totals" ? "" : ""
+              }`}
+            >
               {formatNumber(value)}
             </div>
-            {record.id !== "totals" && parseInt(record.bulletinsBlancs) > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Blancs: {formatNumber(record.bulletinsBlancs)}
-              </div>
-            )}
-            {record.id !== "totals" && parseInt(record.bulletinsNuls) > 0 && (
-              <div className="text-xs text-red-600">
-                Nuls: {formatNumber(record.bulletinsNuls)}
-              </div>
-            )}
+            {String(record.id) !== "totals" &&
+              (typeof record.bulletinsBlancs === "number"
+                ? record.bulletinsBlancs
+                : parseFloat(String(record.bulletinsBlancs || 0))) > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  Blancs: {formatNumber(record.bulletinsBlancs)}
+                </div>
+              )}
+            {String(record.id) !== "totals" &&
+              (typeof record.bulletinsNuls === "number"
+                ? record.bulletinsNuls
+                : parseFloat(String(record.bulletinsNuls || 0))) > 0 && (
+                <div className="text-xs text-red-600">
+                  Nuls: {formatNumber(record.bulletinsNuls)}
+                </div>
+              )}
           </div>
         ),
       },
@@ -541,161 +727,95 @@ export function CelDetailsModal({
         key: "bulletinsBlancs",
         width: 100,
         align: "center",
-        render: (value: string, record: CelData) => (
+        render: (value: number | string, record: CelData) => (
           <div
-            className={`text-sm ${record.id === "totals" ? " font-bold" : ""}`}
+            className={`text-sm ${
+              String(record.id) === "totals" ? " font-bold" : ""
+            }`}
           >
             {formatNumber(value)}
           </div>
         ),
       },
-      {
-        title: "RHDP",
-        children: [
-          {
-            title: "ALASSANE OUATTARA",
-            dataIndex: "score1",
-            key: "score1",
-            width: 100,
-            align: "center",
-            render: (value: string, record: CelData) => (
-              <div
-                className={`text-sm font-medium ${
-                  record.id === "totals" ? " font-bold" : ""
-                }`}
-              >
-                {parseInt(value) > 0 ? formatNumber(value) : "0"}
-              </div>
-            ),
-          },
-        ],
-      },
-      {
-        title: "MGC",
-        children: [
-          {
-            title: "EHIVET SIMONE épouse GBAGBO",
-            dataIndex: "score2",
-            key: "score2",
-            width: 100,
-            align: "center",
-            render: (value: string, record: CelData) => (
-              <div
-                className={`text-sm font-medium ${
-                  record.id === "totals" ? " font-bold" : ""
-                }`}
-              >
-                {parseInt(value) > 0 ? formatNumber(value) : "0"}
-              </div>
-            ),
-          },
-        ],
-      },
-      {
-        title: "GP-PAIX",
-        children: [
-          {
-            title: "LAGOU ADJOUA HENRIETTE",
-            dataIndex: "score3",
-            key: "score3",
-            width: 100,
-            align: "center",
-            render: (value: string, record: CelData) => (
-              <div
-                className={`text-sm font-medium ${
-                  record.id === "totals" ? " font-bold" : ""
-                }`}
-              >
-                {parseInt(value) > 0 ? formatNumber(value) : "0"}
-              </div>
-            ),
-          },
-        ],
-      },
-      {
-        title: "CODE",
-        children: [
-          {
-            title: "BILLON JEAN-LOUIS EUGENE",
-            dataIndex: "score4",
-            key: "score4",
-            width: 100,
-            align: "center",
-            render: (value: string, record: CelData) => (
-              <div
-                className={`text-sm font-medium ${
-                  record.id === "totals" ? " font-bold" : ""
-                }`}
-              >
-                {parseInt(value) > 0 ? formatNumber(value) : "0"}
-              </div>
-            ),
-          },
-        ],
-      },
-      {
-        title: "INDEPENDANT",
-        children: [
-          {
-            title: "DON-MELLO SENIN AHOUA JACOB",
-            dataIndex: "score5",
-            key: "score5",
-            width: 100,
-            align: "center",
-            render: (value: string, record: CelData) => (
-              <div
-                className={`text-sm font-medium ${
-                  record.id === "totals" ? " font-bold" : ""
-                }`}
-              >
-                {parseInt(value) > 0 ? formatNumber(value) : "0"}
-              </div>
-            ),
-          },
-        ],
-      },
-    ],
-    [celData]
-  );
+      // ✅ Colonnes dynamiques pour les candidats
+      ...candidateColumns.map((numDos) => ({
+        title: numDos,
+        dataIndex: numDos,
+        key: numDos,
+        width: 100,
+        align: "center" as const,
+        render: (
+          value: number | string | null | undefined,
+          record: CelData
+        ) => {
+          const numValue =
+            typeof value === "number"
+              ? value
+              : parseFloat(String(value || 0)) || 0;
+          return (
+            <div
+              className={`text-sm font-medium ${
+                String(record.id) === "totals" ? " font-bold" : ""
+              }`}
+              data-index={`score-${numDos}`}
+            >
+              {numValue > 0 ? formatNumber(numValue) : "0"}
+            </div>
+          );
+        },
+      })),
+    ];
 
-  // Fonction pour calculer les totaux
+    return baseColumns;
+  }, [celData, candidateColumns]);
+
+  // Fonction pour calculer les totaux avec colonnes dynamiques
   const calculateTotals = (data: CelData[]): CelData => {
+    // Initialiser les totaux de base
+    const baseTotals = {
+      populationHommes: 0,
+      populationFemmes: 0,
+      populationTotale: 0,
+      votantsHommes: 0,
+      votantsFemmes: 0,
+      totalVotants: 0,
+      bulletinsNuls: 0,
+      suffrageExprime: 0,
+      bulletinsBlancs: 0,
+    };
+
+    // Map pour stocker les totaux des candidats (colonnes dynamiques)
+    const candidateTotals = new Map<string, number>();
+
+    // Calculer les totaux
     const totals = data.reduce(
       (acc, item) => {
-        acc.populationHommes += parseInt(item.populationHommes) || 0;
-        acc.populationFemmes += parseInt(item.populationFemmes) || 0;
-        acc.populationTotale += parseInt(item.populationTotale) || 0;
-        acc.personnelAstreinte += parseInt(item.personnesAstreintes) || 0;
-        acc.votantsHommes += parseInt(item.votantsHommes) || 0;
-        acc.votantsFemmes += parseInt(item.votantsFemmes) || 0;
-        acc.totalVotants += parseInt(item.totalVotants) || 0;
-        acc.bulletinsNuls += parseInt(item.bulletinsNuls) || 0;
-        acc.suffrageExprime += parseInt(item.suffrageExprime) || 0;
-        acc.bulletinsBlancs += parseInt(item.bulletinsBlancs) || 0;
-        acc.score1 += parseInt(item.score1) || 0;
-        acc.score2 += parseInt(item.score2) || 0;
-        acc.score3 += parseInt(item.score3) || 0;
-        acc.score4 += parseInt(item.score4) || 0;
-        acc.score5 += parseInt(item.score5) || 0;
+        acc.populationHommes += parseInt(String(item.populationHommes)) || 0;
+        acc.populationFemmes += parseInt(String(item.populationFemmes)) || 0;
+        acc.populationTotale += parseInt(String(item.populationTotale)) || 0;
+        acc.votantsHommes += parseInt(String(item.votantsHommes)) || 0;
+        acc.votantsFemmes += parseInt(String(item.votantsFemmes)) || 0;
+        acc.totalVotants += parseInt(String(item.totalVotants)) || 0;
+        acc.bulletinsNuls += parseInt(String(item.bulletinsNuls)) || 0;
+        acc.suffrageExprime += parseInt(String(item.suffrageExprime)) || 0;
+        acc.bulletinsBlancs += parseInt(String(item.bulletinsBlancs)) || 0;
+
+        // Calculer les totaux pour chaque colonne de candidat (dynamique)
+        candidateColumns.forEach((numDos) => {
+          const value = item[numDos];
+          const numValue =
+            typeof value === "number"
+              ? value
+              : parseFloat(String(value || 0)) || 0;
+          candidateTotals.set(
+            numDos,
+            (candidateTotals.get(numDos) || 0) + numValue
+          );
+        });
+
         return acc;
       },
-      {
-        populationHommes: 0,
-        populationFemmes: 0,
-        populationTotale: 0,
-        personnelAstreinte: 0,
-        votantsHommes: 0,
-        votantsFemmes: 0,
-        totalVotants: 0,
-        bulletinsNuls: 0,
-        suffrageExprime: 0,
-        bulletinsBlancs: 0,
-        score1: 0,
-        score2: 0,
-        score3: 0,
-        score4: 0,
-        score5: 0,
-      }
+      { ...baseTotals }
     );
 
     // Calculer le taux de participation global
@@ -704,30 +824,34 @@ export function CelDetailsModal({
         ? ((totals.totalVotants / totals.populationTotale) * 100).toFixed(2)
         : "0.00";
 
-    return {
-      id: "totals",
+    // Construire l'objet de totaux avec les colonnes dynamiques
+    // Note: Les types dans CelData sont number, mais on doit gérer les strings aussi
+    const totalsRow: any = {
+      id: "totals" as any,
       codeCellule: "",
-      ordre: "",
+      ordre: 0,
       referenceLieuVote: "",
       libelleLieuVote: "TOTAL GÉNÉRAL",
       numeroBureauVote: "",
-      populationHommes: totals.populationHommes.toString(),
-      populationFemmes: totals.populationFemmes.toString(),
-      populationTotale: totals.populationTotale.toString(),
-      personnesAstreintes: totals.personnelAstreinte.toString(),
-      votantsHommes: totals.votantsHommes.toString(),
-      votantsFemmes: totals.votantsFemmes.toString(),
-      totalVotants: totals.totalVotants.toString(),
-      tauxParticipation: tauxParticipation,
-      bulletinsNuls: totals.bulletinsNuls.toString(),
-      suffrageExprime: totals.suffrageExprime.toString(),
-      bulletinsBlancs: totals.bulletinsBlancs.toString(),
-      score1: totals.score1.toString(),
-      score2: totals.score2.toString(),
-      score3: totals.score3.toString(),
-      score4: totals.score4.toString(),
-      score5: totals.score5.toString(),
+      populationHommes: totals.populationHommes,
+      populationFemmes: totals.populationFemmes,
+      populationTotale: totals.populationTotale,
+      votantsHommes: totals.votantsHommes,
+      votantsFemmes: totals.votantsFemmes,
+      totalVotants: totals.totalVotants,
+      tauxParticipation: parseFloat(tauxParticipation),
+      bulletinsNuls: totals.bulletinsNuls,
+      suffrageExprime: totals.suffrageExprime,
+      bulletinsBlancs: totals.bulletinsBlancs,
+      statutSuppressionBv: null,
     };
+
+    // Ajouter les totaux des candidats (colonnes dynamiques)
+    candidateTotals.forEach((total, numDos) => {
+      totalsRow[numDos] = total;
+    });
+
+    return totalsRow as CelData;
   };
 
   // Données filtrées pour la recherche avec ligne de totaux
@@ -735,7 +859,11 @@ export function CelDetailsModal({
     if (!celData?.data) return [];
 
     let data = celData.data.sort(
-      (a, b) => parseInt(a.ordre) - parseInt(b.ordre)
+      (a, b) =>
+        (typeof a.ordre === "number"
+          ? a.ordre
+          : parseInt(String(a.ordre || 0))) -
+        (typeof b.ordre === "number" ? b.ordre : parseInt(String(b.ordre || 0)))
     );
 
     if (searchText) {
@@ -756,7 +884,8 @@ export function CelDetailsModal({
     // Ajouter la ligne de totaux au début
     const totalsRow = calculateTotals(data);
     return [totalsRow, ...data];
-  }, [celData?.data, searchText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celData?.data, searchText, candidateColumns]);
 
   const exportToPDFWithImages = async () => {
     if (!celData || !importData || pdfLoading) return;
@@ -765,9 +894,9 @@ export function CelDetailsModal({
       setPdfLoading(true);
       // Import dynamique de jsPDF
       const { jsPDF } = await import("jspdf");
-      
+
       const doc = new jsPDF("landscape", "mm", "a3");
-      
+
       // Ajouter le logo CEI (à gauche)
       try {
         const logoResponse = await fetch("/images/logos/logocei2.webp");
@@ -777,7 +906,7 @@ export function CelDetailsModal({
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(logoBlob);
         });
-        
+
         // Ajouter l'image du logo (position: x=14, y=10, taille: 40x30)
         doc.addImage(logoDataUrl, "WEBP", 14, 10, 30, 30);
       } catch (error) {
@@ -802,16 +931,16 @@ export function CelDetailsModal({
 
       // Calculer les totaux
       const totalsRow = calculateTotals(celData.data);
-      
+
       // Titre Section 1: Statistiques principales
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('STATISTIQUES PRINCIPALES', 14, 50);
-      
+      doc.setFont("helvetica", "bold");
+      doc.text("STATISTIQUES PRINCIPALES", 14, 50);
+
       // Section 1: Statistiques principales
       let startY = 60;
-      
+
       // Carte Inscrits
       doc.setFillColor(59, 130, 246); // Bleu
       doc.rect(14, startY, 85, 25, "F");
@@ -820,49 +949,50 @@ export function CelDetailsModal({
       doc.setFont("helvetica", "bold");
       doc.text("INSCRITS", 18, startY + 8);
       doc.setFontSize(16);
-      doc.text(formatNumberForPDF(celData.metrics.inscrits.total), 18, startY + 18);
-      
-      // Carte Personnel d'astreinte
-      doc.setFillColor(251, 146, 60); // Orange
+      doc.text(
+        formatNumberForPDF(celData.metrics.inscrits.total),
+        18,
+        startY + 18
+      );
+
+      // Carte Votants
+      doc.setFillColor(34, 197, 94); // Vert
       doc.rect(105, startY, 85, 25, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("PERSONNEL", 109, startY + 6);
-      doc.text("D'ASTREINTE", 109, startY + 12);
+      doc.text("VOTANTS", 109, startY + 8);
       doc.setFontSize(16);
-      doc.text(formatNumberForPDF(totalsRow.personnesAstreintes), 109, startY + 22);
-      
-      // Carte Votants
-      doc.setFillColor(34, 197, 94); // Vert
+      doc.text(
+        formatNumberForPDF(celData.metrics.votants.total),
+        109,
+        startY + 18
+      );
+
+      // Carte Participation
+      doc.setFillColor(168, 85, 247); // Violet
       doc.rect(196, startY, 85, 25, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("VOTANTS", 200, startY + 8);
+      doc.text("TAUX DE", 200, startY + 6);
+      doc.text("PARTICIPATION", 200, startY + 12);
       doc.setFontSize(16);
-      doc.text(formatNumberForPDF(celData.metrics.votants.total), 200, startY + 18);
-      
-      // Carte Participation
-      doc.setFillColor(168, 85, 247); // Violet
-      doc.rect(287, startY, 85, 25, "F");
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("TAUX DE", 291, startY + 6);
-      doc.text("PARTICIPATION", 291, startY + 12);
-      doc.setFontSize(16);
-      doc.text(`${celData.metrics.tauxParticipation.toFixed(2)}%`, 291, startY + 22);
+      doc.text(
+        `${celData.metrics.tauxParticipation.toFixed(2)}%`,
+        200,
+        startY + 22
+      );
 
       // Titre Section 2: Bulletins
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('BULLETINS DE VOTE', 14, 100);
-      
+      doc.setFont("helvetica", "bold");
+      doc.text("BULLETINS DE VOTE", 14, 100);
+
       // Section 2: Bulletins
       startY = 105;
-      
+
       // Carte Bulletins Nuls
       doc.setFillColor(239, 68, 68); // Rouge
       doc.rect(14, startY, 85, 25, "F");
@@ -873,7 +1003,7 @@ export function CelDetailsModal({
       doc.text("NULS", 18, startY + 12);
       doc.setFontSize(16);
       doc.text(formatNumberForPDF(totalsRow.bulletinsNuls), 18, startY + 22);
-      
+
       // Carte Suffrages Exprimés
       doc.setFillColor(34, 197, 94); // Vert
       doc.rect(105, startY, 85, 25, "F");
@@ -884,7 +1014,7 @@ export function CelDetailsModal({
       doc.text("EXPRIMÉS", 109, startY + 12);
       doc.setFontSize(16);
       doc.text(formatNumberForPDF(totalsRow.suffrageExprime), 109, startY + 22);
-      
+
       // Carte Bulletins Blancs
       doc.setFillColor(107, 114, 128); // Gris
       doc.rect(196, startY, 85, 25, "F");
@@ -899,167 +1029,155 @@ export function CelDetailsModal({
       // Titre Section 3: Candidats
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('RÉSULTATS', 14, 145);
-      
+      doc.setFont("helvetica", "bold");
+      doc.text("RÉSULTATS", 14, 145);
+
       // Section 3: Candidats
       startY = 155;
-      const candidateWidth = 70;
-      const candidateSpacing = 75;
-      
-      // Calculer les pourcentages et déterminer le vainqueur
-      const totalSuffrages = parseInt(totalsRow.suffrageExprime);
-      const candidates = [
-        {
-          name: "ALASSANE OUATTARA",
-          party: "RHDP",
-          logo: "/images/candidates/logo-alassane.jpg",
-          photo: "/images/candidates/photo-alassane.jpg",
-          score: parseInt(totalsRow.score1),
-          percentage: totalSuffrages > 0 ? ((parseInt(totalsRow.score1) / totalSuffrages) * 100).toFixed(2) : '0.00'
-        },
-        {
-          name: "EHIVET SIMONE épouse GBAGBO",
-          party: "MGC",
-          logo: "/images/candidates/logo-simone.png",
-          photo: "/images/candidates/photo-simone.jpg",
-          score: parseInt(totalsRow.score2),
-          percentage: totalSuffrages > 0 ? ((parseInt(totalsRow.score2) / totalSuffrages) * 100).toFixed(2) : '0.00'
-        },
-        {
-          name: "LAGOU ADJOUA HENRIETTE",
-          party: "GP-PAIX",
-          logo: "/images/candidates/logo-henriette.jpg",
-          photo: "/images/candidates/photo-henriette.jpg",
-          score: parseInt(totalsRow.score3),
-          percentage: totalSuffrages > 0 ? ((parseInt(totalsRow.score3) / totalSuffrages) * 100).toFixed(2) : '0.00'
-        },
-        {
-          name: "BILLON JEAN-LOUIS EUGENE",
-          party: "CODE",
-          logo: "/images/candidates/logo-jean-louis.JPG",
-          photo: "/images/candidates/photo-jean-louis.jpg",
-          score: parseInt(totalsRow.score4),
-          percentage: totalSuffrages > 0 ? ((parseInt(totalsRow.score4) / totalSuffrages) * 100).toFixed(2) : '0.00'
-        },
-        {
-          name: "DON-MELLO SENIN AHOUA JACOB",
-          party: "INDEPENDANT",
-          logo: "/images/candidates/logo-ahoua.JPG",
-          photo: "/images/candidates/photo-ahoua.jpg",
-          score: parseInt(totalsRow.score5),
-          percentage: totalSuffrages > 0 ? ((parseInt(totalsRow.score5) / totalSuffrages) * 100).toFixed(2) : '0.00'
-        }
-      ];
+
+      // Calculer les pourcentages et déterminer le vainqueur avec colonnes dynamiques
+      const totalSuffrages = parseInt(String(totalsRow.suffrageExprime)) || 0;
+
+      // Construire la liste des candidats dynamiquement à partir des colonnes
+      const candidates = candidateColumns
+        .map((numDos) => {
+          const value = totalsRow[numDos];
+          const score =
+            typeof value === "number"
+              ? value
+              : parseFloat(String(value || 0)) || 0;
+          return {
+            numDos,
+            score,
+            percentage:
+              totalSuffrages > 0
+                ? ((score / totalSuffrages) * 100).toFixed(2)
+                : "0.00",
+          };
+        })
+        .filter((c) => c.score > 0); // Filtrer les candidats avec score > 0
 
       // Déterminer le vainqueur ou égalité
-      const maxScore = Math.max(...candidates.map(c => c.score));
-      const winners = candidates.filter(c => c.score === maxScore && c.score > 0);
+      const maxScore =
+        candidates.length > 0 ? Math.max(...candidates.map((c) => c.score)) : 0;
+      const winners = candidates.filter(
+        (c) => c.score === maxScore && c.score > 0
+      );
       const isTie = winners.length > 1;
 
-      // Dessiner les cartes des candidats
+      // Calculer la largeur et l'espacement dynamiques selon le nombre de candidats
+      const pageWidth = 420; // Largeur A3 en paysage (mm)
+      const marginLeft = 14;
+      const marginRight = 14;
+      const availableWidth = pageWidth - marginLeft - marginRight;
+      const minCandidateWidth = 60;
+      const maxCandidatesPerRow = Math.floor(
+        availableWidth / minCandidateWidth
+      );
+
+      // Adapter la largeur et l'espacement selon le nombre de candidats
+      let candidateWidth: number;
+      let candidateSpacing: number;
+
+      if (candidates.length <= maxCandidatesPerRow) {
+        // Tous les candidats sur une seule ligne
+        candidateWidth = Math.min(
+          70,
+          (availableWidth - (candidates.length - 1) * 5) / candidates.length
+        );
+        candidateSpacing = candidateWidth + 5;
+      } else {
+        // Plusieurs lignes nécessaires
+        candidateWidth = minCandidateWidth;
+        candidateSpacing = candidateWidth + 5;
+      }
+
+      // Dessiner les cartes des candidats (version simplifiée avec NUM_DOS uniquement)
+      let currentRow = 0;
+      let currentCol = 0;
+      const candidatesPerRow = Math.min(candidates.length, maxCandidatesPerRow);
+
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
-        const x = 14 + (i * candidateSpacing);
-        
+
+        // Calculer la position (gérer les retours à la ligne)
+        if (i > 0 && i % candidatesPerRow === 0) {
+          currentRow++;
+          currentCol = 0;
+        } else if (i > 0) {
+          currentCol++;
+        }
+
+        const x = marginLeft + currentCol * candidateSpacing;
+        const y = startY + currentRow * 60; // 60mm d'espacement vertical entre les lignes
+
         // Carte du candidat
         doc.setFillColor(255, 255, 255); // Blanc
-        doc.rect(x, startY, candidateWidth, 50, "F");
+        doc.rect(x, y, candidateWidth, 50, "F");
         doc.setDrawColor(0, 0, 0); // Bordure noire
-        doc.rect(x, startY, candidateWidth, 50, "S");
-        
-        // Logo du candidat
-        try {
-          const logoResponse = await fetch(candidate.logo);
-          const logoBlob = await logoResponse.blob();
-          const logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(logoBlob);
-          });
-          
-          const logoExtension = candidate.logo.split('.').pop()?.toUpperCase() || 'JPG';
-          doc.addImage(logoDataUrl, logoExtension as any, x + 2, startY + 2, 15, 15);
-        } catch (error) {
-          console.warn(`Impossible de charger le logo de ${candidate.name}:`, error);
-        }
-        
-        // Photo du candidat
-        try {
-          const photoResponse = await fetch(candidate.photo);
-          const photoBlob = await photoResponse.blob();
-          const photoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(photoBlob);
-          });
-          
-          const photoExtension = candidate.photo.split('.').pop()?.toUpperCase() || 'JPG';
-          doc.addImage(photoDataUrl, photoExtension as any, x + 2, startY + 18, 25, 30);
-        } catch (error) {
-          console.warn(`Impossible de charger la photo de ${candidate.name}:`, error);
-        }
-        
-        // Nom du candidat et parti
+        doc.rect(x, y, candidateWidth, 50, "S");
+
+        // NUM_DOS du candidat
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        doc.text(candidate.party, x + 30, startY + 8);
-        doc.setFontSize(6);
-        doc.setFont("helvetica", "normal");
-        const nameLines = doc.splitTextToSize(candidate.name, candidateWidth - 35);
-        doc.text(nameLines, x + 30, startY + 12);
-        
+        const numDosLines = doc.splitTextToSize(
+          candidate.numDos,
+          candidateWidth - 4
+        );
+        doc.text(numDosLines, x + 2, y + 8);
+
         // Score et pourcentage
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(formatNumberForPDF(candidate.score), x + 30, startY + 25);
+        doc.text(formatNumberForPDF(candidate.score), x + 2, y + 25);
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.text("VOIX", x + 30, startY + 30);
-        
+        doc.text("VOIX", x + 2, y + 30);
+
         // Pourcentage
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(`${candidate.percentage}%`, x + 30, startY + 38);
-        
+        doc.text(`${candidate.percentage}%`, x + 2, y + 38);
+
         // Indicateur vainqueur/égalité
-        const isWinner = winners.some(w => w.name === candidate.name && w.score === candidate.score);
+        const isWinner = winners.some(
+          (w) => w.numDos === candidate.numDos && w.score === candidate.score
+        );
         if (isWinner) {
           if (isTie) {
             // Égalité - bordure dorée
             doc.setDrawColor(255, 215, 0);
             doc.setLineWidth(3);
-            doc.rect(x, startY, candidateWidth, 50, "S");
+            doc.rect(x, y, candidateWidth, 50, "S");
             doc.setFontSize(6);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(255, 215, 0);
-            doc.text("ÉGALITÉ", x + 2, startY - 2);
+            doc.text("ÉGALITÉ", x + 2, y - 2);
           } else {
             // Vainqueur - bordure verte
             doc.setDrawColor(34, 197, 94);
             doc.setLineWidth(3);
-            doc.rect(x, startY, candidateWidth, 50, "S");
+            doc.rect(x, y, candidateWidth, 50, "S");
             doc.setFontSize(6);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(34, 197, 94);
-            doc.text("VAINQUEUR", x + 2, startY - 2);
+            doc.text("VAINQUEUR", x + 2, y - 2);
           }
         }
-        
+
         // Réinitialiser les styles
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(1);
         doc.setTextColor(0, 0, 0);
       }
-      
+
       // Sauvegarder le PDF
       doc.save(
         `CEL_${importData.codeCellule}_${importData.nomFichier}_AVEC_IMAGES_${
           new Date().toISOString().split("T")[0]
         }.pdf`
       );
-      
     } catch (error) {
       console.error("Erreur lors de l'export PDF avec images:", error);
     } finally {
@@ -1097,10 +1215,10 @@ export function CelDetailsModal({
       // En-tête du document (décalé à droite pour laisser place au logo)
       doc.setFontSize(18);
       doc.setFont("helvetica", "normal");
-      doc.text(`ELECTION DU PRESIDENT DE LA REPUBLIQUE`, 60, 20);
+      doc.text(`ELECTION LEGISLATIVES 2025`, 60, 20);
       doc.setFontSize(18);
       doc.setFont("helvetica", "normal");
-      doc.text(`SCRUTIN DU 25 OCTOBRE 2025`, 60, 28);
+      doc.text(`SCRUTIN DU 27 DECEMBRE 2025`, 60, 28);
 
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
@@ -1145,66 +1263,51 @@ export function CelDetailsModal({
       );
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-       doc.text(
-         `Total: ${formatNumberForPDF(celData.metrics.inscrits.total)}`,
-         18,
-         startY + 21
-       );
+      doc.text(
+        `Total: ${formatNumberForPDF(celData.metrics.inscrits.total)}`,
+        18,
+        startY + 21
+      );
 
-       // Carte Personnel d'astreinte
-       doc.setFillColor(251, 146, 60); // Orange
-       doc.rect(105, startY, 85, 22, "F");
-       doc.setTextColor(255, 255, 255);
-       doc.setFontSize(10);
-       doc.setFont("helvetica", "bold");
-       doc.text("PERSONNEL D'ASTREINTE", 109, startY + 6);
-       doc.setFontSize(16);
-       doc.setFont("helvetica", "bold");
-       const totalPersonnelAstreinte = celData.data.reduce(
-         (acc, bureau) => acc + (parseInt(bureau.personnesAstreintes) || 0),
-         0
-       );
-       doc.text(totalPersonnelAstreinte.toString(), 109, startY + 16);
-
-       // Carte Votants
-       doc.setFillColor(34, 197, 94); // Vert
-       doc.rect(196, startY, 85, 22, "F");
+      // Carte Votants
+      doc.setFillColor(34, 197, 94); // Vert
+      doc.rect(105, startY, 85, 22, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text("VOTANTS", 200, startY + 6);
+      doc.text("VOTANTS", 109, startY + 6);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text(
         `Hommes: ${formatNumberForPDF(celData.metrics.votants.hommes)}`,
-        200,
+        109,
         startY + 10
       );
       doc.text(
         `Femmes: ${formatNumberForPDF(celData.metrics.votants.femmes)}`,
-        200,
+        109,
         startY + 14
       );
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text(
         `Total: ${formatNumberForPDF(celData.metrics.votants.total)}`,
-        200,
+        109,
         startY + 21
       );
 
       // Carte Participation
       doc.setFillColor(168, 85, 247); // Violet
-      doc.rect(287, startY, 85, 22, "F");
+      doc.rect(196, startY, 85, 22, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text("TAUX DE PARTICIPATION", 291, startY + 6);
+      doc.text("TAUX DE PARTICIPATION", 200, startY + 6);
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text(
         `${celData.metrics.tauxParticipation.toFixed(2)}%`,
-        291,
+        200,
         startY + 16
       );
 
@@ -1217,33 +1320,77 @@ export function CelDetailsModal({
       doc.text("Détail par Bureau de Vote", 14, 95);
 
       const sortedData = celData.data.sort(
-        (a, b) => parseInt(a.ordre) - parseInt(b.ordre)
+        (a, b) =>
+          (typeof a.ordre === "number"
+            ? a.ordre
+            : parseInt(String(a.ordre || 0))) -
+          (typeof b.ordre === "number"
+            ? b.ordre
+            : parseInt(String(b.ordre || 0)))
       );
       const totalsRow = calculateTotals(sortedData);
 
-      const tableData = [totalsRow, ...sortedData].map((bureau) => [
-        bureau.ordre || "",
-        bureau.libelleLieuVote,
-        bureau.id === "totals"
-          ? celData?.totalBureaux || 0
-          : bureau.numeroBureauVote,
-        formatNumberForPDF(bureau.populationHommes),
-        formatNumberForPDF(bureau.populationFemmes),
-        formatNumberForPDF(bureau.populationTotale),
-        formatNumberForPDF(bureau.personnesAstreintes || "0"),
-        formatNumberForPDF(bureau.votantsHommes),
-        formatNumberForPDF(bureau.votantsFemmes),
-        formatNumberForPDF(bureau.totalVotants),
-        formatPercentage(bureau.tauxParticipation),
-        formatNumberForPDF(bureau.bulletinsNuls),
-        formatNumberForPDF(bureau.suffrageExprime),
-        formatNumberForPDF(bureau.bulletinsBlancs),
-        parseInt(bureau.score1) > 0 ? formatNumberForPDF(bureau.score1) : "0",
-        parseInt(bureau.score2) > 0 ? formatNumberForPDF(bureau.score2) : "0",
-        parseInt(bureau.score3) > 0 ? formatNumberForPDF(bureau.score3) : "0",
-        parseInt(bureau.score4) > 0 ? formatNumberForPDF(bureau.score4) : "0",
-        parseInt(bureau.score5) > 0 ? formatNumberForPDF(bureau.score5) : "0",
-      ]);
+      // Construire les données du tableau avec colonnes dynamiques
+      const tableData = [totalsRow, ...sortedData].map((bureau) => {
+        const baseRow = [
+          bureau.ordre || "",
+          bureau.libelleLieuVote,
+          String(bureau.id) === "totals"
+            ? celData?.totalBureaux || 0
+            : bureau.numeroBureauVote,
+          formatNumberForPDF(bureau.populationHommes),
+          formatNumberForPDF(bureau.populationFemmes),
+          formatNumberForPDF(bureau.populationTotale),
+          formatNumberForPDF(bureau.votantsHommes),
+          formatNumberForPDF(bureau.votantsFemmes),
+          formatNumberForPDF(bureau.totalVotants),
+          formatPercentage(bureau.tauxParticipation),
+          formatNumberForPDF(bureau.bulletinsNuls),
+          formatNumberForPDF(bureau.suffrageExprime),
+          formatNumberForPDF(bureau.bulletinsBlancs),
+        ];
+
+        // Ajouter les colonnes dynamiques des candidats
+        candidateColumns.forEach((numDos) => {
+          const value = bureau[numDos];
+          const numValue =
+            typeof value === "number"
+              ? value
+              : parseFloat(String(value || 0)) || 0;
+          baseRow.push(numValue > 0 ? formatNumberForPDF(numValue) : "0");
+        });
+
+        return baseRow;
+      });
+
+      // Construire les en-têtes dynamiques pour les candidats
+      const candidateHeaders = candidateColumns.map((numDos) => ({
+        content: numDos,
+        rowSpan: 2,
+        styles: { halign: "center" as const, valign: "middle" as const },
+      }));
+
+      // Calculer la largeur des colonnes en fonction du nombre de candidats
+      const baseColumnsCount = 13; // Nombre de colonnes fixes
+      const totalColumns = baseColumnsCount + candidateColumns.length;
+      const pageWidth = 420; // Largeur A3 en paysage (mm)
+      const fixedColumnsWidth =
+        15 + 40 + 15 + 20 + 20 + 20 + 20 + 20 + 20 + 20 + 18 + 20 + 20; // Total des colonnes fixes
+      const availableWidthForCandidates = pageWidth - fixedColumnsWidth - 20; // -20 pour marges
+      const candidateColumnWidth =
+        candidateColumns.length > 0
+          ? Math.min(
+              20,
+              Math.max(
+                15,
+                availableWidthForCandidates / candidateColumns.length
+              )
+            )
+          : 20;
+
+      // Ajuster la taille de police selon le nombre de colonnes
+      const fontSize = totalColumns > 20 ? 6 : totalColumns > 15 ? 7 : 8;
+      const cellPadding = totalColumns > 20 ? 1 : 2;
 
       autoTable(doc, {
         startY: 100,
@@ -1270,11 +1417,6 @@ export function CelDetailsModal({
               styles: { halign: "center", fillColor: [111, 221, 111] },
             },
             {
-              content: "PERS. ASTREINTE",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
-            {
               content: "VOTANTS",
               colSpan: 3,
               styles: { halign: "center", fillColor: [111, 221, 111] },
@@ -1299,31 +1441,8 @@ export function CelDetailsModal({
               rowSpan: 2,
               styles: { halign: "center", valign: "middle" },
             },
-            {
-              content: "RHDP",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
-            {
-              content: "MGC",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
-            {
-              content: "GP-PAIX",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
-            {
-              content: "CODE",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
-            {
-              content: "INDEPENDANT",
-              rowSpan: 2,
-              styles: { halign: "center", valign: "middle" },
-            },
+            // Ajouter les en-têtes dynamiques des candidats
+            ...candidateHeaders,
           ],
           ["HOMMES", "FEMMES", "TOTAL", "HOMMES", "FEMMES", "TOTAL"],
         ],
@@ -1332,13 +1451,13 @@ export function CelDetailsModal({
         headStyles: {
           fillColor: [111, 221, 111],
           textColor: [0, 0, 0],
-          fontSize: 8,
+          fontSize: fontSize,
           halign: "center",
           fontStyle: "bold",
         },
         styles: {
-          fontSize: 7,
-          cellPadding: 2,
+          fontSize: fontSize - 1,
+          cellPadding: cellPadding,
           halign: "center",
         },
         columnStyles: {
@@ -1348,23 +1467,30 @@ export function CelDetailsModal({
           3: { cellWidth: 20 }, // POPULATION HOMMES
           4: { cellWidth: 20 }, // POPULATION FEMMES
           5: { cellWidth: 20 }, // POPULATION TOTAL
-          6: { cellWidth: 20 }, // PERS. ASTREINTE
-          7: { cellWidth: 20 }, // VOTANTS HOMMES
-          8: { cellWidth: 20 }, // VOTANTS FEMMES
-          9: { cellWidth: 20 }, // VOTANTS TOTAL
-          10: { cellWidth: 20 }, // TAUX PARTICIPATION
-          11: { cellWidth: 18 }, // BULLETINS NULS
-          12: { cellWidth: 20 }, // SUFFR. EXPRIMES
-          13: { cellWidth: 20 }, // BULLETINS BLANCS
-          14: { cellWidth: 20 }, // RHDP
-          15: { cellWidth: 20 }, // MGC
-          16: { cellWidth: 20 }, // GP-PAIX
-          17: { cellWidth: 20 }, // CODE
-          18: { cellWidth: 20 }, // INDEPENDANT
+          6: { cellWidth: 20 }, // VOTANTS HOMMES
+          7: { cellWidth: 20 }, // VOTANTS FEMMES
+          8: { cellWidth: 20 }, // VOTANTS TOTAL
+          9: { cellWidth: 20 }, // TAUX PARTICIPATION
+          10: { cellWidth: 18 }, // BULLETINS NULS
+          11: { cellWidth: 20 }, // SUFFR. EXPRIMES
+          12: { cellWidth: 20 }, // BULLETINS BLANCS
+          // Styles dynamiques pour les colonnes de candidats (largeur adaptative)
+          ...Object.fromEntries(
+            candidateColumns.map((_, index) => [
+              13 + index,
+              { cellWidth: candidateColumnWidth },
+            ])
+          ),
         },
-        didParseCell: (data) => {
+        didParseCell: (data: any) => {
           // Mettre en gras et en vert la première ligne (totaux)
-          if (data.row.index === 0 && data.section === "body") {
+          if (
+            data.row.index === 0 &&
+            data.section === "body" &&
+            data.row.raw &&
+            Array.isArray(data.row.raw) &&
+            String(data.row.raw[0]) === "totals"
+          ) {
             data.cell.styles.fillColor = [34, 197, 94]; // Vert #22c55e
             data.cell.styles.textColor = [255, 255, 255]; // Blanc
             data.cell.styles.fontStyle = "bold";
@@ -1392,31 +1518,47 @@ export function CelDetailsModal({
       <DialogContent className="max-w-none w-[95vw] h-[95vh] max-h-[95vh] overflow-hidden p-0">
         <DialogHeader className="p-6 pb-2 border-b bg-white">
           <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="flex items-center gap-2 text-2xl">
-                <Building2 className="h-6 w-6 text-green-600" />
+            <div className="flex-1">
+              {/* Nom de la CEL */}
+              <DialogTitle className="flex items-center gap-2 text-2xl mb-2">
+                <Building2 className="h-6 w-6 text-green-600 flex-shrink-0" />
                 <span className="uppercase font-light">
                   Commission Électorale Locale :{" "}
                 </span>
                 <span className="font-black text-green-600">
-                  {importData.nomFichier}
+                  {importData.libelleCellule}
                 </span>
               </DialogTitle>
-              <DialogDescription className="text-base mt-2">
-                <span className="inline-flex items-center gap-4">
-                  <span className="flex items-center gap-1">
-                    <Hash className="h-4 w-4" />
-                    Code:{" "}
-                    <span className="font-semibold text-orange-600">
-                      {importData.codeCellule}
-                    </span>
+
+              {/* Circonscription - alignée avec le texte */}
+              {(celData?.libelleCirconscription ||
+                importData.libelleCirconscription) && (
+                <div className="flex items-center gap-2 text-lg text-gray-600 mb-2 ml-8">
+                  <span className="font-medium">Circonscription :</span>
+                  <span className="font-semibold text-blue-600">
+                    {celData?.codeCirconscription ||
+                      importData.codeCirconscription}{" "}
+                    -{" "}
+                    {celData?.libelleCirconscription ||
+                      importData.libelleCirconscription}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-4 w-4" />
-                    Statut:{" "}
-                    <span className="font-semibold text-green-600">
-                      {importData.statutImport}
-                    </span>
+                </div>
+              )}
+
+              {/* Code CEL et Total bureaux - alignés */}
+              <DialogDescription className="flex items-center gap-6 text-base ml-8">
+                <span className="flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">Code CEL :</span>
+                  <span className="font-semibold text-orange-600">
+                    {importData.codeCellule}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">Bureaux de vote:</span>
+                  <span className="font-semibold text-green-600">
+                    {celData?.totalBureaux || importData.nombreBureauxVote}
                   </span>
                 </span>
               </DialogDescription>
@@ -1424,16 +1566,8 @@ export function CelDetailsModal({
             {celData && !loading && (
               <div className="flex gap-2">
                 {/* Bouton d'upload de fichier signé */}
-                <Button
-                  onClick={handleUploadClick}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                  size="sm"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importer fichier signé
-                </Button>
-                
-                <Button
+
+                {/* <Button
                   onClick={exportToPDFWithImages}
                   disabled={pdfLoading}
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
@@ -1458,7 +1592,7 @@ export function CelDetailsModal({
                     <Download className="h-4 w-4 mr-2" />
                   )}
                   {pdfLoading ? "Génération..." : "Exporter PDF"}
-                </Button>
+                </Button> */}
               </div>
             )}
           </div>
@@ -1630,6 +1764,15 @@ export function CelDetailsModal({
             {celData && (
               <>
                 <Button
+                  onClick={handleUploadClick}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importer fichier signé
+                </Button>
+
+                <Button
                   onClick={exportToPDFWithImages}
                   disabled={pdfLoading}
                   variant="outline"
@@ -1643,7 +1786,7 @@ export function CelDetailsModal({
                   )}
                   {pdfLoading ? "Génération..." : "Export PDF avec images"}
                 </Button>
-                <Button
+                {/* <Button
                   onClick={exportToPDF}
                   disabled={pdfLoading}
                   variant="outline"
@@ -1656,7 +1799,7 @@ export function CelDetailsModal({
                     <Download className="h-4 w-4 mr-2" />
                   )}
                   {pdfLoading ? "Génération..." : "Exporter PDF"}
-                </Button>
+                </Button> */}
               </>
             )}
             <Button variant="outline" onClick={onClose} size="sm">
@@ -1667,7 +1810,10 @@ export function CelDetailsModal({
         </div>
 
         {/* Dialog d'upload de fichier signé */}
-        <AlertDialog open={showUploadDialog} onOpenChange={handleCloseUploadDialog}>
+        <AlertDialog
+          open={showUploadDialog}
+          onOpenChange={handleCloseUploadDialog}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
@@ -1675,14 +1821,13 @@ export function CelDetailsModal({
                 Importer fichier CEL signé
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Téléchargez le fichier de la CEL signé par le superviseur pour{' '}
+                Téléchargez le fichier de la CEL signé par le superviseur pour{" "}
                 <strong>{importData?.nomFichier}</strong>.
                 <br />
                 <br />
                 <span className="text-sm text-muted-foreground">
                   • Formats acceptés : PDF, JPG, PNG
-                  <br />
-                  • Taille maximale : 10 MB
+                  <br />• Taille maximale : 10 MB
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1692,28 +1837,38 @@ export function CelDetailsModal({
                 <div className="flex items-center justify-center py-8 bg-blue-50 rounded-lg mb-4">
                   <div className="text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
-                    <p className="text-sm text-blue-600 font-medium">Upload en cours...</p>
-                    <p className="text-xs text-blue-500 mt-1">Veuillez patienter pendant le téléchargement</p>
+                    <p className="text-sm text-blue-600 font-medium">
+                      Upload en cours...
+                    </p>
+                    <p className="text-xs text-blue-500 mt-1">
+                      Veuillez patienter pendant le téléchargement
+                    </p>
                   </div>
                 </div>
               )}
 
               {/* Message de feedback */}
               {uploadMessage.type && (
-                <div className={`rounded-lg p-4 mb-4 ${
-                  uploadMessage.type === 'success' 
-                    ? 'bg-green-50 border border-green-200' 
-                    : 'bg-red-50 border border-red-200'
-                }`}>
+                <div
+                  className={`rounded-lg p-4 mb-4 ${
+                    uploadMessage.type === "success"
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-red-50 border border-red-200"
+                  }`}
+                >
                   <div className="flex items-center">
-                    {uploadMessage.type === 'success' ? (
+                    {uploadMessage.type === "success" ? (
                       <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
                     ) : (
                       <XCircle className="h-5 w-5 text-red-600 mr-2" />
                     )}
-                    <p className={`text-sm font-medium ${
-                      uploadMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
-                    }`}>
+                    <p
+                      className={`text-sm font-medium ${
+                        uploadMessage.type === "success"
+                          ? "text-green-800"
+                          : "text-red-800"
+                      }`}
+                    >
                       {uploadMessage.text}
                     </p>
                   </div>
@@ -1727,7 +1882,32 @@ export function CelDetailsModal({
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        if (file && importData) {
+                          // ✅ Validation immédiate lors de la sélection
+                          const validation = validateFile(
+                            file,
+                            importData.codeCellule
+                          );
+                          if (!validation.valid) {
+                            setUploadMessage({
+                              type: "error",
+                              text: validation.error || "Erreur de validation",
+                            });
+                            toast.error("Fichier invalide", {
+                              description: validation.error,
+                              duration: 5000,
+                            });
+                            // Réinitialiser l'input
+                            e.target.value = "";
+                            setSelectedFile(null);
+                            return;
+                          }
+                          setUploadMessage({ type: null, text: "" });
+                        }
+                        setSelectedFile(file);
+                      }}
                       className="hidden"
                       id="cel-file"
                       disabled={uploadLoading}
@@ -1735,9 +1915,9 @@ export function CelDetailsModal({
                     <label
                       htmlFor="cel-file"
                       className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-                        uploadLoading 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-purple-600 hover:bg-purple-700'
+                        uploadLoading
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-purple-600 hover:bg-purple-700"
                       }`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
@@ -1745,8 +1925,14 @@ export function CelDetailsModal({
                     </label>
                     {selectedFile && (
                       <div className="mt-2 text-sm text-gray-600">
-                        <p><strong>Fichier sélectionné :</strong> {selectedFile.name}</p>
-                        <p><strong>Taille :</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <p>
+                          <strong>Fichier sélectionné :</strong>{" "}
+                          {selectedFile.name}
+                        </p>
+                        <p>
+                          <strong>Taille :</strong>{" "}
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1754,10 +1940,13 @@ export function CelDetailsModal({
               )}
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={uploadLoading} onClick={handleCloseUploadDialog}>
-                {uploadLoading ? 'Fermer' : 'Annuler'}
+              <AlertDialogCancel
+                disabled={uploadLoading}
+                onClick={handleCloseUploadDialog}
+              >
+                {uploadLoading ? "Fermer" : "Annuler"}
               </AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={handleFileUpload}
                 disabled={!selectedFile || uploadLoading}
                 className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
@@ -1767,7 +1956,7 @@ export function CelDetailsModal({
                 ) : (
                   <Upload className="mr-2 h-4 w-4" />
                 )}
-                {uploadLoading ? 'Upload en cours...' : 'Uploader le fichier'}
+                {uploadLoading ? "Upload en cours..." : "Uploader le fichier"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

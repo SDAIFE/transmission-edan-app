@@ -18,37 +18,19 @@ export interface ImportDetails {
 
 // Interface pour les données d'un import (selon les spécifications backend)
 export interface ImportData {
-  id: string;
+  id?: string; // Optionnel car peut être généré côté frontend
   codeCellule: string;
-  nomFichier: string; // libelleCellule dans la réponse backend
-  statutImport: ImportStatus; // 'I' ou 'P' → COMPLETED dans la réponse
-  messageErreur?: string;
-  dateImport: string;
-  nombreLignesImportees: number; // Nombre de lieux de vote
-  nombreLignesEnErreur: number;
-  nombreBureauxVote: number; // Nombre de bureaux de vote
-  details: ImportDetails;
-  // ✨ NOUVEAU : Informations géographiques
-  departement?: {
-    codeDepartement: string;
-    libelleDepartement: string;
-  };
-  region?: {
-    codeRegion: string;
-    libelleRegion: string;
-  };
-  // ✨ NOUVEAU : Informations de l'utilisateur qui a importé
-  importePar?: {
+  libelleCellule: string;
+  codeCirconscription: string;
+  libelleCirconscription: string;
+  nomFichier: string;
+  nombreBureauxVote: number;
+  dateDernierImport: string;
+  utilisateurAssign?: {
     id: string;
-    numeroUtilisateur: string;
-    nom: string;
-    prenom: string;
+    firstName: string;
+    lastName: string;
     email: string;
-    nomComplet: string;
-    role?: {
-      code: string;
-      libelle: string;
-    };
   };
 }
 
@@ -111,9 +93,8 @@ export interface ImportFilters {
   limit?: number;
   codeCellule?: string;
   statut?: ImportStatus;
-  // ✨ NOUVEAU : Filtres géographiques
-  codeRegion?: string;
-  codeDepartement?: string;
+  // ✨ Filtre par circonscription
+  codeCirconscription?: string;
 }
 
 // Interface pour les options d'upload
@@ -322,51 +303,62 @@ export interface UploadFormData {
   nombreBv?: number;
 }
 
-// Types pour les détails de CEL
+// Types pour les détails de CEL (selon API /api/v1/legislatives/upload/cel/:codeCellule/data)
 export interface CelData {
-  id: string;
-  codeCellule: string;
-  ordre: string;
-  referenceLieuVote: string;
-  libelleLieuVote: string;
-  numeroBureauVote: string;
-  populationHommes: string;
-  populationFemmes: string;
-  populationTotale: string;
-  personnesAstreintes: string;
-  votantsHommes: string;
-  votantsFemmes: string;
-  totalVotants: string;
-  tauxParticipation: string;
-  bulletinsNuls: string;
-  suffrageExprime: string;
-  bulletinsBlancs: string;
-  score1: string;
-  score2: string;
-  score3: string;
-  score4: string;
-  score5: string;
+  id: number;                       // ID du bureau de vote
+  codeCellule: string;              // Code CEL
+  ordre: number;                    // Ordre d'affichage (1, 2, 3...)
+  referenceLieuVote: string;        // Référence LV (12 chiffres)
+  libelleLieuVote: string;          // Libellé du lieu de vote
+  numeroBureauVote: string;          // Numéro du bureau (ex: "01")
+
+  // Données démographiques
+  populationHommes: number;         // Population hommes
+  populationFemmes: number;         // Population femmes
+  populationTotale: number;         // Population totale
+
+  // Données de vote
+  votantsHommes: number;            // Votants hommes
+  votantsFemmes: number;            // Votants femmes
+  totalVotants: number;             // Total votants
+  tauxParticipation: number;         // Taux de participation (%)
+
+  // Bulletins
+  bulletinsNuls: number;             // Bulletins nuls
+  suffrageExprime: number;          // Suffrage exprimé
+  bulletinsBlancs: number;           // Bulletins blancs
+
+  // Statut
+  statutSuppressionBv: string | null; // Statut suppression BV ("OK" | "NOK" | null)
+
+  // Scores des candidats (colonnes dynamiques)
+  // Les clés sont les NUM_DOS des candidats (format: "U-02108", "U-02122", etc.)
+  [numDos: string]: number | string | null;
 }
 
 export interface CelMetrics {
   inscrits: {
-    total: number;
-    hommes: number;
-    femmes: number;
+    total: number;      // Total des inscrits
+    hommes: number;     // Inscrits hommes
+    femmes: number;     // Inscrits femmes
   };
   votants: {
-    total: number;
-    hommes: number;
-    femmes: number;
+    total: number;      // Total des votants
+    hommes: number;    // Votants hommes
+    femmes: number;     // Votants femmes
   };
-  tauxParticipation: number;
-  suffrageExprime: number;
+  tauxParticipation: number;    // Taux de participation global (%)
+  suffrageExprime: number;       // Total suffrage exprimé
+  bulletinsBlancs: number;       // Total bulletins blancs
+  bulletinsNuls: number;         // Total bulletins nuls
 }
 
 export interface CelDataResponse {
-  codeCellule: string;
-  libelleCellule: string;
-  totalBureaux: number;
-  data: CelData[];
-  metrics: CelMetrics;
+  codeCellule: string;              // Code CEL (ex: "S003")
+  libelleCellule: string;           // Libellé CEL (ex: "CESP CECHI")
+  codeCirconscription: string;      // Code circonscription (ex: "004")
+  libelleCirconscription: string | null;  // Libellé circonscription
+  totalBureaux: number;             // Nombre total de bureaux de vote
+  data: CelData[];                  // Tableau des bureaux de vote
+  metrics: CelMetrics;              // Métriques agrégées
 }
