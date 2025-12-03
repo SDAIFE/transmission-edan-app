@@ -31,7 +31,6 @@ import {
   Search,
   CheckCircle,
   XCircle,
-  Hash,
   Users,
   Vote,
   TrendingUp,
@@ -41,9 +40,20 @@ import { legislativesPublicationsApi } from "@/lib/api/legislatives-publications
 import type {
   CirconscriptionDetailsModalProps,
   CirconscriptionDataResponse,
-  CelAggregatedData,
-  CandidateScore,
 } from "@/types/legislatives-publications";
+
+// Type pour les lignes du tableau des CELs
+interface CelTableRow {
+  key: string;
+  codeCel: string;
+  libelleCel: string | null;
+  inscrits: number;
+  votants: number;
+  participation: number;
+  nombreBureaux: number;
+  isTotal: boolean;
+  [key: `candidate_${string}`]: number; // Colonnes dynamiques pour les candidats
+}
 
 // Styles personnalisés pour le tableau
 const tableStyles = `
@@ -84,6 +94,31 @@ const tableStyles = `
     background-color: #f0fdf4 !important;
     text-align: center !important;
   }
+  
+  /* Styles pour la ligne de totaux */
+  .circonscription-results-table .ant-table-tbody > tr[data-row-key="totals"] {
+    background-color: #22c55e !important;
+  }
+  
+  .circonscription-results-table .ant-table-tbody > tr[data-row-key="totals"] > td {
+    background-color: #22c55e !important;
+    color: white !important;
+    font-weight: bold !important;
+    border: 2px solid #16a34a !important;
+  }
+  
+  .circonscription-results-table .ant-table-tbody > tr[data-row-key="totals"]:hover > td {
+    background-color: #16a34a !important;
+  }
+  
+  .circonscription-results-table .ant-table-tbody > tr[data-row-key="totals"] > td[data-index*="candidate"] {
+    background-color: #22c55e !important;
+    color: white !important;
+  }
+  
+  .circonscription-results-table .ant-table-tbody > tr[data-row-key="totals"]:hover > td[data-index*="candidate"] {
+    background-color: #16a34a !important;
+  }
 `;
 
 export function CirconscriptionDetailsModal({
@@ -105,7 +140,9 @@ export function CirconscriptionDetailsModal({
 
   const loadData = async () => {
     if (!codeCirconscription) {
-      console.warn("⚠️ [CirconscriptionDetailsModal] Pas de codeCirconscription fourni");
+      console.warn(
+        "⚠️ [CirconscriptionDetailsModal] Pas de codeCirconscription fourni"
+      );
       return;
     }
 
@@ -127,15 +164,25 @@ export function CirconscriptionDetailsModal({
 
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
-        console.log("📥 [CirconscriptionDetailsModal] Données reçues:", response);
+        console.log(
+          "📥 [CirconscriptionDetailsModal] Données reçues:",
+          response
+        );
       }
 
       setData(response);
-    } catch (err: any) {
-      console.error("❌ [CirconscriptionDetailsModal] Erreur lors du chargement:", err);
-      setError(err.message || "Erreur lors du chargement des données");
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erreur lors du chargement des données";
+      console.error(
+        "❌ [CirconscriptionDetailsModal] Erreur lors du chargement:",
+        err
+      );
+      setError(errorMessage);
       toast.error("Erreur lors du chargement des données", {
-        description: err.message,
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -150,6 +197,7 @@ export function CirconscriptionDetailsModal({
       setError(null);
       setSearchText("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, codeCirconscription]);
 
   // Injecter les styles CSS
@@ -199,12 +247,31 @@ export function CirconscriptionDetailsModal({
     return Array.from(allCandidates).sort();
   }, [data]);
 
-  // Préparer les données pour le tableau des CELs
+  // Préparer les données pour le tableau des CELs avec ligne de totaux
   const celsTableData = useMemo(() => {
     if (!data || !data.cels) return [];
 
-    return data.cels.map((cel, index) => {
-      const row: any = {
+    // Créer la ligne de totaux agrégés (première ligne)
+    const totalsRow: CelTableRow = {
+      key: "totals",
+      codeCel: "TOTAL",
+      libelleCel: "RÉSULTATS AGRÉGÉS",
+      inscrits: data.inscrits,
+      votants: data.votants,
+      participation: data.participation,
+      nombreBureaux: data.nombreBureaux,
+      isTotal: true, // Flag pour identifier la ligne de totaux
+    };
+
+    // Ajouter les scores totaux des candidats depuis data.candidats
+    candidateColumns.forEach((numDos) => {
+      const candidat = data.candidats?.find((c) => c.numeroDossier === numDos);
+      totalsRow[`candidate_${numDos}`] = candidat?.score || 0;
+    });
+
+    // Créer les lignes pour chaque CEL
+    const celsRows = data.cels.map((cel, index) => {
+      const row: CelTableRow = {
         key: cel.codeCel || `cel-${index}`,
         codeCel: cel.codeCel,
         libelleCel: cel.libelleCel,
@@ -212,6 +279,7 @@ export function CirconscriptionDetailsModal({
         votants: cel.votants,
         participation: cel.participation,
         nombreBureaux: cel.nombreBureaux,
+        isTotal: false,
       };
 
       // Ajouter les scores des candidats comme colonnes dynamiques
@@ -222,19 +290,28 @@ export function CirconscriptionDetailsModal({
 
       return row;
     });
+
+    // Retourner la ligne de totaux en premier, suivie des CELs
+    return [totalsRow, ...celsRows];
   }, [data, candidateColumns]);
 
   // Colonnes du tableau des CELs
-  const celsColumns: TableColumnsType<any> = useMemo(() => {
-    const baseColumns: TableColumnsType<any> = [
+  const celsColumns: TableColumnsType<CelTableRow> = useMemo(() => {
+    const baseColumns: TableColumnsType<CelTableRow> = [
       {
         title: "Code CEL",
         dataIndex: "codeCel",
         key: "codeCel",
         width: 100,
         fixed: "left",
-        render: (value: string) => (
-          <div className="font-medium text-sm">{value}</div>
+        render: (value: string, record: CelTableRow) => (
+          <div
+            className={`font-medium text-sm ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {value}
+          </div>
         ),
       },
       {
@@ -243,38 +320,14 @@ export function CirconscriptionDetailsModal({
         key: "libelleCel",
         width: 200,
         fixed: "left",
-        render: (value: string | null) => (
-          <div className="text-sm">{value || "Sans libellé"}</div>
-        ),
-      },
-      {
-        title: "Inscrits",
-        dataIndex: "inscrits",
-        key: "inscrits",
-        width: 100,
-        align: "center",
-        render: (value: number) => (
-          <div className="text-sm font-medium">{formatNumber(value)}</div>
-        ),
-      },
-      {
-        title: "Votants",
-        dataIndex: "votants",
-        key: "votants",
-        width: 100,
-        align: "center",
-        render: (value: number) => (
-          <div className="text-sm font-medium text-blue-600">{formatNumber(value)}</div>
-        ),
-      },
-      {
-        title: "Participation",
-        dataIndex: "participation",
-        key: "participation",
-        width: 100,
-        align: "center",
-        render: (value: number) => (
-          <div className="text-sm font-medium text-green-600">{formatPercentage(value)}</div>
+        render: (value: string | null, record: CelTableRow) => (
+          <div
+            className={`text-sm ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {value || "Sans libellé"}
+          </div>
         ),
       },
       {
@@ -283,8 +336,66 @@ export function CirconscriptionDetailsModal({
         key: "nombreBureaux",
         width: 80,
         align: "center",
-        render: (value: number) => (
-          <div className="text-sm">{formatNumber(value)}</div>
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {formatNumber(value)}
+          </div>
+        ),
+      },
+      {
+        title: "Inscrits",
+        dataIndex: "inscrits",
+        key: "inscrits",
+        width: 100,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {formatNumber(value)}
+          </div>
+        ),
+      },
+      {
+        title: "Votants",
+        dataIndex: "votants",
+        key: "votants",
+        width: 100,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal
+                ? "font-bold text-white bg-green-500"
+                : "text-blue-600"
+            }`}
+          >
+            {formatNumber(value)}
+          </div>
+        ),
+      },
+      {
+        title: "Participation",
+        dataIndex: "participation",
+        key: "participation",
+        width: 100,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal
+                ? "font-bold text-white bg-green-500"
+                : "text-green-600"
+            }`}
+          >
+            {formatPercentage(value)}
+          </div>
         ),
       },
     ];
@@ -306,8 +417,13 @@ export function CirconscriptionDetailsModal({
         key: `candidate_${numDos}`,
         width: 100,
         align: "center" as const,
-        render: (value: number) => (
-          <div className="text-sm font-medium" data-index={`candidate-${numDos}`}>
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+            data-index={`candidate-${numDos}`}
+          >
             {value > 0 ? formatNumber(value) : "0"}
           </div>
         ),
@@ -402,7 +518,9 @@ export function CirconscriptionDetailsModal({
                         <Users className="h-4 w-4" />
                         <span>Inscrits</span>
                       </div>
-                      <div className="text-2xl font-bold">{formatNumber(data.inscrits)}</div>
+                      <div className="text-2xl font-bold">
+                        {formatNumber(data.inscrits)}
+                      </div>
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -427,14 +545,16 @@ export function CirconscriptionDetailsModal({
                         <FileText className="h-4 w-4" />
                         <span>Bureaux</span>
                       </div>
-                      <div className="text-2xl font-bold">{formatNumber(data.nombreBureaux)}</div>
+                      <div className="text-2xl font-bold">
+                        {formatNumber(data.nombreBureaux)}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Tableau des candidats */}
-              {data.candidats && data.candidats.length > 0 && (
+              {/* {data.candidats && data.candidats.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Candidats - Scores Globaux</CardTitle>
@@ -448,18 +568,25 @@ export function CirconscriptionDetailsModal({
                             <th className="border p-2 text-left">Nom</th>
                             <th className="border p-2 text-left">Parti</th>
                             <th className="border p-2 text-center">Score</th>
-                            <th className="border p-2 text-center">Pourcentage</th>
+                            <th className="border p-2 text-center">
+                              Pourcentage
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {data.candidats
                             .sort((a, b) => b.score - a.score)
                             .map((candidat, index) => (
-                              <tr key={candidat.numeroDossier} className="hover:bg-gray-50">
+                              <tr
+                                key={candidat.numeroDossier}
+                                className="hover:bg-gray-50"
+                              >
                                 <td className="border p-2">
                                   <Badge variant="outline">{index + 1}</Badge>
                                 </td>
-                                <td className="border p-2 font-medium">{candidat.nom}</td>
+                                <td className="border p-2 font-medium">
+                                  {candidat.nom}
+                                </td>
                                 <td className="border p-2">{candidat.parti}</td>
                                 <td className="border p-2 text-center font-medium">
                                   {formatNumber(candidat.score)}
@@ -474,7 +601,7 @@ export function CirconscriptionDetailsModal({
                     </div>
                   </CardContent>
                 </Card>
-              )}
+              )} */}
 
               {/* Tableau des CELs avec données agrégées */}
               <Card>
@@ -482,7 +609,8 @@ export function CirconscriptionDetailsModal({
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Building2 className="h-5 w-5" />
-                      Données par CEL ({filteredCels.length} CEL{filteredCels.length > 1 ? "s" : ""})
+                      Données par CEL ({filteredCels.length} CEL
+                      {filteredCels.length > 1 ? "s" : ""})
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       <div className="relative">
@@ -519,7 +647,10 @@ export function CirconscriptionDetailsModal({
               {!isUser && (
                 <div className="flex items-center justify-end gap-2">
                   {onPublish && (
-                    <Button onClick={handlePublishClick} className="bg-green-600 hover:bg-green-700">
+                    <Button
+                      onClick={handlePublishClick}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Publier
                     </Button>
@@ -560,13 +691,16 @@ export function CirconscriptionDetailsModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer la publication</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir publier la circonscription {codeCirconscription} ? Cette
-              action rendra les résultats publics.
+              Êtes-vous sûr de vouloir publier la circonscription{" "}
+              {codeCirconscription} ? Cette action rendra les résultats publics.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPublish} className="bg-green-600 hover:bg-green-700">
+            <AlertDialogAction
+              onClick={confirmPublish}
+              className="bg-green-600 hover:bg-green-700"
+            >
               Publier
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -578,8 +712,8 @@ export function CirconscriptionDetailsModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer l&apos;annulation</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir annuler la publication de la circonscription{" "}
-              {codeCirconscription} ?
+              Êtes-vous sûr de vouloir annuler la publication de la
+              circonscription {codeCirconscription} ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -596,4 +730,3 @@ export function CirconscriptionDetailsModal({
     </>
   );
 }
-

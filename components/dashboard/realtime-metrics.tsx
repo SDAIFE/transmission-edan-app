@@ -283,7 +283,7 @@ export function RealtimeMetrics({
 
       {/* Imports en cours */}
       {/* ✅ ADAPTATION : Utilise count/imports (nouveau format) ou nombre/liste (ancien format) */}
-      {(metrics.importsEnCours.count || metrics.importsEnCours.nombre || 0) >
+      {/* {(metrics.importsEnCours.count || metrics.importsEnCours.nombre || 0) >
         0 && (
         <Card>
           <CardHeader>
@@ -298,7 +298,7 @@ export function RealtimeMetrics({
           <CardContent>
             <div className="space-y-2">
               {/* ✅ ADAPTATION : Utilise imports (nouveau format) ou liste (ancien format) */}
-              {(
+              {/* {(
                 metrics.importsEnCours.imports ||
                 metrics.importsEnCours.liste ||
                 []
@@ -322,7 +322,7 @@ export function RealtimeMetrics({
                   >
                     <div>
                       {/* ✅ ADAPTATION : Structure selon le format (nouveau ou ancien) */}
-                      <span className="font-medium">
+                      {/* <span className="font-medium">
                         {importItem.COD_CE || importItem.codeCellule || "N/A"}
                       </span>
                       <span className="text-sm text-muted-foreground ml-2">
@@ -347,9 +347,9 @@ export function RealtimeMetrics({
                 )
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </CardContent> */}
+       {/* </div> </Card> */}
+      {/* )} */} 
 
       {/* Alertes critiques */}
       {/* {(metrics.alertesCritiques.celsEnErreurCritique > 0 || 
