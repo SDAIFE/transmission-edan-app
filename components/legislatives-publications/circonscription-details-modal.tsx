@@ -659,7 +659,7 @@ export function CirconscriptionDetailsModal({
                     <Button
                       onClick={handleCancelClick}
                       variant="destructive"
-                      className="bg-red-600 hover:bg-red-700"
+                      className="bg-red-600 text-white hover:bg-red-700"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
                       Annuler la publication
