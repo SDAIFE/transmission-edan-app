@@ -40,6 +40,21 @@ export type {
   CelExcelDataResponse,
 } from '@/types/legislatives';
 
+// Services API pour les publications législatives
+export { legislativesPublicationsApi } from './legislatives-publications';
+export type {
+  LegislativePublicationStats,
+  Circonscription,
+  CirconscriptionQuery,
+  CirconscriptionListResponse,
+  PublicationActionResult,
+  CirconscriptionDetails,
+  CirconscriptionDataResponse,
+  NationalDataResponse,
+  CandidateScore,
+  CelAggregatedData,
+} from '@/types/legislatives-publications';
+
 // Services API pour les rôles
 export { rolesApi } from './roles';
 export type { Role } from './roles';

@@ -32,13 +32,13 @@ const navigationItems = [
   },
   {
     title: "Publications",
-    href: "/publications",
+    href: "/legislatives-publications",
     icon: BarChart3,
     roles: ["ADMIN", "SADMIN"],
   },
   {
     title: "Consolidation",
-    href: "/consolidation",
+    href: "/legislatives-publications",
     icon: CheckSquare,
     roles: ["USER"],
   },
