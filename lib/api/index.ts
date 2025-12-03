@@ -55,6 +55,31 @@ export type {
   CelAggregatedData,
 } from '@/types/legislatives-publications';
 
+// Services API pour la supervision législatives
+export { legislativesSupervisionApi } from './legislatives-supervision';
+export type {
+  SupervisionDashboardResponse,
+  SupervisionCirconscriptionResponse,
+  SupervisionStatsResponse,
+  VueEnsemble,
+  RegionSupervision,
+  Alerte,
+  MetriquesPerformance,
+  HistoriqueEntry,
+  CirconscriptionSupervision,
+  CandidatSupervision,
+  ListeSupervision,
+  MetriquesCirconscription,
+  CelSupervision,
+  HistoriquePublication,
+  StatistiquesSupervision,
+  AnalysesSupervision,
+  TendancesSupervision,
+  RapportsPerformance,
+  TypeAlerte,
+  PrioriteAlerte,
+} from '@/types/legislatives-supervision';
+
 // Services API pour les rôles
 export { rolesApi } from './roles';
 export type { Role } from './roles';

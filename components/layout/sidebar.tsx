@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChartBar,
   CheckSquare,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,12 @@ const navigationItems = [
     href: "/legislatives-publications",
     icon: CheckSquare,
     roles: ["USER"],
+  },
+  {
+    title: "Supervision",
+    href: "/legislatives-supervision",
+    icon: Eye,
+    roles: ["ADMIN", "SADMIN", "MANAGER"],
   },
   {
     title: "Résultats",
