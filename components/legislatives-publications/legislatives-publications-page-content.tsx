@@ -53,7 +53,7 @@ export function LegislativesPublicationsPageContent({
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   // États pour la modal des données nationales
-  const [isNationalDataModalOpen, setIsNationalDataModalOpen] = useState(false);
+  // const [isNationalDataModalOpen, setIsNationalDataModalOpen] = useState(false);
 
   // Référence pour éviter les dépendances circulaires
   const filtersRef = useRef(filters);
@@ -281,14 +281,14 @@ export function LegislativesPublicationsPageContent({
   // Le header parent utilise onRefresh directement depuis ses props
 
   // Ouvrir la modal des données nationales
-  const handleOpenNationalData = useCallback(() => {
-    setIsNationalDataModalOpen(true);
-  }, []);
+  // const handleOpenNationalData = useCallback(() => {
+  //   setIsNationalDataModalOpen(true);
+  // }, []);
 
   // Fermer la modal des données nationales
-  const handleCloseNationalData = useCallback(() => {
-    setIsNationalDataModalOpen(false);
-  }, []);
+  // const handleCloseNationalData = useCallback(() => {
+  //   setIsNationalDataModalOpen(false);
+  // }, []);
 
   // Vérifier si on peut afficher les boutons de données nationales
   const showNationalDataButtons = useMemo(() => {
@@ -366,10 +366,10 @@ export function LegislativesPublicationsPageContent({
       )}
 
       {/* Modal des données nationales */}
-      <NationalDataModal
+      {/* <NationalDataModal
         isOpen={isNationalDataModalOpen}
         onClose={handleCloseNationalData}
-      />
+      /> */}
     </div>
   );
 }
