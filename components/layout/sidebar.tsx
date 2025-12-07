@@ -49,12 +49,12 @@ const navigationItems = [
     icon: Eye,
     roles: ["ADMIN", "SADMIN", "MANAGER"],
   },
-  {
-    title: "Résultats",
-    href: "/results",
-    icon: ChartBar,
-    roles: ["USER", "ADMIN", "SADMIN"],
-  },
+  // {
+  //   title: "Résultats",
+  //   href: "/results",
+  //   icon: ChartBar,
+  //   roles: ["USER", "ADMIN", "SADMIN"],
+  // },
   {
     title: "Utilisateurs",
     href: "/utilisateurs",

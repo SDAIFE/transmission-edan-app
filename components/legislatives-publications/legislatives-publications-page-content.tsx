@@ -301,7 +301,7 @@ export function LegislativesPublicationsPageContent({
       <LegislativeStatsSection stats={stats} loading={loading} />
 
       {/* Boutons de données nationales (ADMIN/SADMIN uniquement) */}
-      {showNationalDataButtons && (
+      {/* {showNationalDataButtons && (
         <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -324,7 +324,7 @@ export function LegislativesPublicationsPageContent({
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Filtres et recherche */}
       <CirconscriptionFilters
