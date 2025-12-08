@@ -205,6 +205,51 @@ export function CelDetailsModal({
     );
   }, [celData]);
 
+  // ✅ Calculer les vainqueurs et égalités à partir de la ligne de totaux
+  const winnersAndTies = useMemo(() => {
+    if (!celData?.data || celData.data.length === 0 || candidateColumns.length === 0) {
+      return { winners: [], isTie: false };
+    }
+
+    // Calculer les totaux des scores de chaque candidat
+    const candidateTotals = new Map<string, number>();
+    
+    celData.data.forEach((item) => {
+      candidateColumns.forEach((numDos) => {
+        const value = item[numDos];
+        const numValue =
+          typeof value === "number"
+            ? value
+            : parseFloat(String(value || 0)) || 0;
+        candidateTotals.set(
+          numDos,
+          (candidateTotals.get(numDos) || 0) + numValue
+        );
+      });
+    });
+
+    // Construire la liste des candidats avec leurs scores totaux
+    const candidates = Array.from(candidateTotals.entries())
+      .map(([numDos, score]) => ({
+        numDos,
+        score,
+      }))
+      .filter((c) => c.score > 0); // Filtrer les candidats avec score > 0
+
+    if (candidates.length === 0) {
+      return { winners: [], isTie: false };
+    }
+
+    // Déterminer le score maximum
+    const maxScore = Math.max(...candidates.map((c) => c.score));
+    const winners = candidates.filter((c) => c.score === maxScore);
+
+    return {
+      winners: winners.map((w) => w.numDos),
+      isTie: winners.length > 1,
+    };
+  }, [celData, candidateColumns]);
+
   const formatNumber = (value: string | number): string => {
     const num = typeof value === "string" ? parseFloat(value) || 0 : value;
     return num.toLocaleString("fr-FR");
@@ -737,37 +782,56 @@ export function CelDetailsModal({
           </div>
         ),
       },
-      // ✅ Colonnes dynamiques pour les candidats
-      ...candidateColumns.map((numDos) => ({
-        title: numDos,
-        dataIndex: numDos,
-        key: numDos,
-        width: 100,
-        align: "center" as const,
-        render: (
-          value: number | string | null | undefined,
-          record: CelData
-        ) => {
-          const numValue =
-            typeof value === "number"
-              ? value
-              : parseFloat(String(value || 0)) || 0;
-          return (
-            <div
-              className={`text-sm font-medium ${
-                String(record.id) === "totals" ? " font-bold" : ""
-              }`}
-              data-index={`score-${numDos}`}
-            >
-              {numValue > 0 ? formatNumber(numValue) : "0"}
+      // ✅ Colonnes dynamiques pour les candidats avec badges ELU/EGALITE
+      ...candidateColumns.map((numDos) => {
+        const isWinner = winnersAndTies.winners.includes(numDos);
+        const isTie = winnersAndTies.isTie;
+        
+        return {
+          title: (
+            <div className="flex flex-col items-center gap-1">
+              {isWinner && !isTie && (
+                <Badge className="bg-green-600 text-white font-bold text-xs mb-1">
+                  ELU
+                </Badge>
+              )}
+              {isWinner && isTie && (
+                <Badge className="bg-yellow-600 text-white font-bold text-xs mb-1">
+                  EGALITE
+                </Badge>
+              )}
+              <span className="text-xs font-semibold">{numDos}</span>
             </div>
-          );
-        },
-      })),
+          ),
+          dataIndex: numDos,
+          key: numDos,
+          width: 100,
+          align: "center" as const,
+          render: (
+            value: number | string | null | undefined,
+            record: CelData
+          ) => {
+            const numValue =
+              typeof value === "number"
+                ? value
+                : parseFloat(String(value || 0)) || 0;
+            return (
+              <div
+                className={`text-sm font-medium ${
+                  String(record.id) === "totals" ? " font-bold" : ""
+                }`}
+                data-index={`score-${numDos}`}
+              >
+                {numValue > 0 ? formatNumber(numValue) : "0"}
+              </div>
+            );
+          },
+        };
+      }),
     ];
 
     return baseColumns;
-  }, [celData, candidateColumns]);
+  }, [celData, candidateColumns, winnersAndTies]);
 
   // Fonction pour calculer les totaux avec colonnes dynamiques
   const calculateTotals = (data: CelData[]): CelData => {
