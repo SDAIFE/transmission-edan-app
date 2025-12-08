@@ -54,7 +54,8 @@ export default function LegislativesSupervisionPage() {
           <CardHeader>
             <CardTitle className="text-center">Accès non autorisé</CardTitle>
             <CardDescription className="text-center">
-              Vous n&apos;avez pas les permissions pour accéder à la supervision.
+              Vous n&apos;avez pas les permissions pour accéder à la
+              supervision.
               <br />
               Rôles autorisés : SADMIN, ADMIN, MANAGER
             </CardDescription>
@@ -73,13 +74,13 @@ export default function LegislativesSupervisionPage() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Supervision des Résultats Législatifs</h1>
-            <p className="text-muted-foreground mt-1">
-              Tableau de bord de supervision et statistiques avancées
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">
+            Supervision des Résultats Législatifs
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Tableau de bord de supervision et statistiques avancées
+          </p>
         </div>
 
         {/* Contenu principal */}
@@ -88,9 +89,3 @@ export default function LegislativesSupervisionPage() {
     </MainLayout>
   );
 }
-
-
-
-
-
-

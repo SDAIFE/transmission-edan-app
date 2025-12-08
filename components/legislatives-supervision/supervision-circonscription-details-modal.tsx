@@ -157,6 +157,51 @@ export function SupervisionCirconscriptionDetailsModal({
     },
   ];
 
+  // Colonnes pour les listes
+  const listesColumns: TableColumnsType<any> = [
+    {
+      title: "Rang",
+      dataIndex: "classement",
+      key: "classement",
+      width: 80,
+      align: "center",
+    },
+    {
+      title: "Intitulé",
+      dataIndex: "intitule",
+      key: "intitule",
+      width: 250,
+    },
+    {
+      title: "Score",
+      dataIndex: "score",
+      key: "score",
+      width: 120,
+      align: "center",
+      render: (value: number) => formatNumber(value),
+    },
+    {
+      title: "Pourcentage",
+      dataIndex: "pourcentage",
+      key: "pourcentage",
+      width: 120,
+      align: "center",
+      render: (value: number) => (
+        <span className="font-medium text-green-600">{formatPercentage(value)}</span>
+      ),
+    },
+    {
+      title: "Nombre Élus",
+      dataIndex: "nombreElus",
+      key: "nombreElus",
+      width: 120,
+      align: "center",
+      render: (value: number) => (
+        <span className="font-medium text-blue-600">{formatNumber(value)}</span>
+      ),
+    },
+  ];
+
   // Colonnes pour les CELs
   const celsColumns: TableColumnsType<any> = [
     {
@@ -355,13 +400,31 @@ export function SupervisionCirconscriptionDetailsModal({
             {data.candidats && data.candidats.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Candidats</CardTitle>
+                  <CardTitle>Candidats ({data.candidats.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table
                     columns={candidatsColumns}
                     dataSource={data.candidats}
                     rowKey="numeroDossier"
+                    pagination={{ pageSize: 10 }}
+                    size="small"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Listes */}
+            {data.listes && data.listes.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Listes ({data.listes.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table
+                    columns={listesColumns}
+                    dataSource={data.listes}
+                    rowKey={(record, index) => `liste-${index}`}
                     pagination={{ pageSize: 10 }}
                     size="small"
                   />
@@ -407,6 +470,28 @@ export function SupervisionCirconscriptionDetailsModal({
                 </CardContent>
               </Card>
             )}
+
+            {/* Logs d'activité */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Logs d&apos;Activité
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.logsActivite && data.logsActivite.length > 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    {/* TODO: Ajouter les colonnes pour les logs quand les données seront disponibles */}
+                    <p>{data.logsActivite.length} log(s) disponible(s)</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    Aucun log d&apos;activité disponible pour le moment
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Actions */}
             <div className="flex items-center justify-end">

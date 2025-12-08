@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,6 +12,18 @@ import {
   MapPin,
   Activity,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import type { SupervisionStatsProps } from "@/types/legislatives-supervision";
 
 export function SupervisionStats({ data }: SupervisionStatsProps) {
@@ -28,6 +41,57 @@ export function SupervisionStats({ data }: SupervisionStatsProps) {
       month: "2-digit",
       year: "numeric",
     });
+  };
+
+  const formatDateShort = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
+
+  // Préparer les données pour les graphiques
+  const publicationChartData = useMemo(() => {
+    return data.tendances.evolutionPublication.map((point) => ({
+      date: formatDateShort(point.date),
+      dateFull: point.date,
+      publications: point.nombrePubliees || 0,
+    }));
+  }, [data.tendances.evolutionPublication]);
+
+  const importsChartData = useMemo(() => {
+    return data.tendances.evolutionImports.map((point) => ({
+      date: formatDateShort(point.date),
+      dateFull: point.date,
+      imports: point.nombreImports || 0,
+    }));
+  }, [data.tendances.evolutionImports]);
+
+  // Préparer les données pour le graphique des régions
+  const regionsChartData = useMemo(() => {
+    return Object.entries(data.analyses.circonscriptionsParRegion).map(
+      ([code, count]) => ({
+        region: `Région ${code}`,
+        count,
+      })
+    );
+  }, [data.analyses.circonscriptionsParRegion]);
+
+  // Tooltip personnalisé
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border rounded-lg shadow-lg">
+          <p className="font-medium mb-1">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {entry.value.toLocaleString("fr-FR")}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -121,18 +185,35 @@ export function SupervisionStats({ data }: SupervisionStatsProps) {
             </div>
           </div>
 
-          {/* Circonscriptions par région */}
-          {Object.keys(data.analyses.circonscriptionsParRegion).length > 0 && (
+          {/* Graphique des circonscriptions par région */}
+          {regionsChartData.length > 0 && (
             <div className="mt-6">
               <p className="text-sm font-medium mb-3">Circonscriptions par Région</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(data.analyses.circonscriptionsParRegion).map(([code, count]) => (
-                  <div key={code} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm font-medium">Région {code}</span>
-                    <Badge variant="secondary">{count}</Badge>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={regionsChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
+                  <XAxis
+                    dataKey="region"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    fontSize={11}
+                    stroke="#6b7280"
+                  />
+                  <YAxis
+                    fontSize={11}
+                    stroke="#6b7280"
+                    tickFormatter={(value) => value.toLocaleString("fr-FR")}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="count"
+                    fill="#3b82f6"
+                    radius={[6, 6, 0, 0]}
+                    name="Nombre de circonscriptions"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
         </CardContent>
@@ -148,17 +229,39 @@ export function SupervisionStats({ data }: SupervisionStatsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {data.tendances.evolutionPublication.length > 0 ? (
-              <div className="space-y-2">
-                {data.tendances.evolutionPublication.slice(0, 10).map((point, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm">{formatDate(point.date)}</span>
-                    <Badge>{point.nombrePubliees || 0} publiées</Badge>
-                  </div>
-                ))}
-              </div>
+            {publicationChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={publicationChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
+                  <XAxis
+                    dataKey="date"
+                    fontSize={11}
+                    stroke="#6b7280"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis
+                    fontSize={11}
+                    stroke="#6b7280"
+                    tickFormatter={(value) => value.toLocaleString("fr-FR")}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="publications"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Publications"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground">Aucune donnée disponible</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Aucune donnée disponible
+              </p>
             )}
           </CardContent>
         </Card>
@@ -171,17 +274,39 @@ export function SupervisionStats({ data }: SupervisionStatsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {data.tendances.evolutionImports.length > 0 ? (
-              <div className="space-y-2">
-                {data.tendances.evolutionImports.slice(0, 10).map((point, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm">{formatDate(point.date)}</span>
-                    <Badge>{point.nombreImports || 0} imports</Badge>
-                  </div>
-                ))}
-              </div>
+            {importsChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={importsChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
+                  <XAxis
+                    dataKey="date"
+                    fontSize={11}
+                    stroke="#6b7280"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis
+                    fontSize={11}
+                    stroke="#6b7280"
+                    tickFormatter={(value) => value.toLocaleString("fr-FR")}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="imports"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ fill: "#3b82f6", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Imports"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground">Aucune donnée disponible</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Aucune donnée disponible
+              </p>
             )}
           </CardContent>
         </Card>

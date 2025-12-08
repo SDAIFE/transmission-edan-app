@@ -11,7 +11,7 @@ import type {
  * Base URL: /api/v1/legislatives/resultats/supervision
  * 
  * Permissions:
- * - Tableau de bord: SADMIN, ADMIN, MANAGER uniquement
+ * - Tableau de bord: SADMIN, ADMIN, MANAGER, USER (USER: seulement ses circonscriptions assignées)
  * - Détails circonscription: SADMIN, ADMIN, MANAGER, USER (USER: seulement ses circonscriptions assignées)
  * - Statistiques avancées: SADMIN, ADMIN, MANAGER uniquement
  */
@@ -19,7 +19,7 @@ export const legislativesSupervisionApi = {
   /**
    * Récupérer le tableau de bord de supervision
    * 
-   * Permissions: SADMIN, ADMIN, MANAGER uniquement
+   * Permissions: SADMIN, ADMIN, MANAGER, USER (USER: seulement ses circonscriptions assignées)
    * 
    * @returns Tableau de bord avec statistiques globales, monitoring par région, alertes et indicateurs de performance
    */
@@ -52,7 +52,7 @@ export const legislativesSupervisionApi = {
       }
 
       if (errorObj.response?.status === 403) {
-        throw new Error('Accès interdit. Rôle insuffisant (doit être SADMIN, ADMIN ou MANAGER).');
+        throw new Error('Accès interdit. Rôle insuffisant.');
       }
 
       console.error(

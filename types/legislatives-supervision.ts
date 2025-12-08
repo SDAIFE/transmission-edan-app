@@ -19,7 +19,10 @@ export interface RegionSupervision {
   codeRegion: string;
   libelleRegion: string;
   nombreCirconscriptions: number;
+  nombreCirconscriptionsPubliees?: number; // Optionnel selon le backend
   tauxPublication: number; // Pourcentage
+  nombreCels?: number; // Optionnel selon le backend
+  nombreCelsImportes?: number; // Optionnel selon le backend
   celsEnAttente: number;
 }
 
