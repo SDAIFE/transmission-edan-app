@@ -21,9 +21,11 @@ import {
   X as XIcon,
   FileText,
   Search,
+  List,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { CirconscriptionsContent } from "./circonscriptions-content";
+import { CelsListContent } from "./cels-list-content";
 import type {
   SupervisionDashboardResponse,
   Alerte,
@@ -47,9 +49,9 @@ export function SupervisionDashboard({
   const [selectedAlerteTypes, setSelectedAlerteTypes] = useState<
     Set<TypeAlerte>
   >(new Set());
-  const [activeTab, setActiveTab] = useState<"regions" | "circonscriptions">(
-    "regions"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "regions" | "circonscriptions" | "cels"
+  >("regions");
   const [regionSearchText, setRegionSearchText] = useState("");
 
   // Vérifier si l'utilisateur peut accéder aux circonscriptions (MANAGER, ADMIN, SADMIN)
@@ -594,87 +596,34 @@ export function SupervisionDashboard({
           </div>
         </CardHeader>
         <CardContent>
-          {canAccessCirconscriptions ? (
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => {
-                setActiveTab(value as "regions" | "circonscriptions");
-                // Réinitialiser la recherche lors du changement d'onglet
-                if (value === "circonscriptions") {
-                  setRegionSearchText("");
-                }
-              }}
-            >
-              <TabsList>
-                <TabsTrigger value="regions">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Régions
-                </TabsTrigger>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value as "regions" | "circonscriptions" | "cels");
+              // Réinitialiser la recherche lors du changement d'onglet
+              if (value === "circonscriptions" || value === "cels") {
+                setRegionSearchText("");
+              }
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="regions">
+                <MapPin className="h-4 w-4 mr-2" />
+                Régions
+              </TabsTrigger>
+              {canAccessCirconscriptions && (
                 <TabsTrigger value="circonscriptions">
                   <FileText className="h-4 w-4 mr-2" />
                   Circonscriptions
                 </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="regions" className="mt-4">
-                {filteredRegions.length > 0 ? (
-                  <>
-                    {regionSearchText && (
-                      <div className="mb-4 text-sm text-muted-foreground">
-                        {filteredRegions.length} région
-                        {filteredRegions.length > 1 ? "s" : ""} trouvée
-                        {filteredRegions.length > 1 ? "s" : ""} sur{" "}
-                        {data.regions.length}
-                      </div>
-                    )}
-                    <Table
-                      columns={regionsColumns}
-                      dataSource={filteredRegions}
-                      rowKey="codeRegion"
-                      pagination={{ pageSize: 10 }}
-                      size="small"
-                    />
-                  </>
-                ) : data.regions.length > 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Aucune région ne correspond à votre recherche
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Aucune région disponible
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="circonscriptions" className="mt-4">
-                <CirconscriptionsContent />
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <>
-              {data.regions.length > 0 && (
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Rechercher une région..."
-                      value={regionSearchText}
-                      onChange={(e) => setRegionSearchText(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  {regionSearchText && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRegionSearchText("")}
-                      className="h-9"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
               )}
+              <TabsTrigger value="cels">
+                <List className="h-4 w-4 mr-2" />
+                Liste des CELs
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="regions" className="mt-4">
               {filteredRegions.length > 0 ? (
                 <>
                   {regionSearchText && (
@@ -702,8 +651,18 @@ export function SupervisionDashboard({
                   Aucune région disponible
                 </div>
               )}
-            </>
-          )}
+            </TabsContent>
+
+            {canAccessCirconscriptions && (
+              <TabsContent value="circonscriptions" className="mt-4">
+                <CirconscriptionsContent />
+              </TabsContent>
+            )}
+
+            <TabsContent value="cels" className="mt-4">
+              <CelsListContent />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

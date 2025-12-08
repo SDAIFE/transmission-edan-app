@@ -3,6 +3,7 @@ import type {
   SupervisionDashboardResponse,
   SupervisionCirconscriptionResponse,
   SupervisionStatsResponse,
+  CelsByRegionResponse,
 } from '@/types/legislatives-supervision';
 
 /**
@@ -163,6 +164,53 @@ export const legislativesSupervisionApi = {
 
       console.error(
         '❌ [LegislativesSupervisionAPI] Erreur lors de la récupération des statistiques:',
+        error
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Récupérer la liste des CELs organisées par région et circonscription
+   * 
+   * Permissions: SADMIN, ADMIN, MANAGER, USER (USER: seulement ses circonscriptions assignées)
+   * 
+   * @returns Liste des CELs organisées hiérarchiquement par région et circonscription avec leur statut d'import
+   */
+  getCelsByRegion: async (): Promise<CelsByRegionResponse> => {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('📊 [LegislativesSupervisionAPI] Récupération des CELs par région...');
+      }
+
+      const response = await apiClient.get<CelsByRegionResponse>(
+        '/legislatives/resultats/cels-by-region'
+      );
+
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('✅ [LegislativesSupervisionAPI] CELs par région récupérées:', response.data);
+      }
+
+      return response.data;
+    } catch (error: unknown) {
+      const errorObj = error as { response?: { status?: number; data?: { message?: string } } };
+      
+      if (errorObj.response?.status === 401) {
+        // Rediriger vers la page de connexion
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        throw new Error('Session expirée, veuillez vous reconnecter');
+      }
+
+      if (errorObj.response?.status === 403) {
+        throw new Error('Accès interdit. Rôle insuffisant.');
+      }
+
+      console.error(
+        '❌ [LegislativesSupervisionAPI] Erreur lors de la récupération des CELs par région:',
         error
       );
       throw error;

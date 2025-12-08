@@ -166,12 +166,24 @@ export function ImportsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>CEL</TableHead>
-                <TableHead>Circonscription</TableHead>
-                <TableHead>Utilisateur</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Bureaux</TableHead>
-                <TableHead className="w-[50px]">Actions</TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800">
+                  CEL
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800">
+                  Circonscription
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800">
+                  Utilisateur
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800">
+                  Date
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800">
+                  Bureaux
+                </TableHead>
+                <TableHead className="w-[50px] bg-gray-100 dark:bg-gray-800">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -290,7 +302,7 @@ export function ImportsTable({
 
                         <DropdownMenuSeparator />
 
-                        {onDelete && (
+                        {/* {onDelete && (
                           <DropdownMenuItem
                             className="text-red-600"
                             onClick={() =>
@@ -303,7 +315,7 @@ export function ImportsTable({
                             <Trash2 className="mr-2 h-4 w-4" />
                             Supprimer
                           </DropdownMenuItem>
-                        )}
+                        )} */}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

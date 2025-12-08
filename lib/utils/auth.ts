@@ -7,14 +7,14 @@
  */
 export async function getAuthToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
-  
+
   try {
     const response = await fetch('/api/auth/token', {
       credentials: 'include'
     });
-    
+
     if (!response.ok) return null;
-    
+
     const { token } = await response.json();
     return token || null;
   } catch {
@@ -29,14 +29,14 @@ export async function getAuthToken(): Promise<string | null> {
  */
 export async function hasAuthToken(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
-  
+
   try {
     const response = await fetch('/api/auth/token', {
       credentials: 'include'
     });
-    
+
     if (!response.ok) return false;
-    
+
     const { hasToken } = await response.json();
     return hasToken === true;
   } catch {
@@ -107,7 +107,7 @@ export async function isTokenExpired(): Promise<boolean> {
   try {
     const token = await getAuthToken();
     if (!token) return true;
-    
+
     const payload = JSON.parse(atob(token.split('.')[1]));
     return Date.now() >= payload.exp * 1000;
   } catch {
@@ -144,14 +144,14 @@ export function decodeJWT(token: string): unknown {
  */
 export function getUserRole(): string | null {
   if (typeof window === 'undefined') return null;
-  
+
   // Lire depuis les cookies côté client
   const cookies = document.cookie.split(';');
   const roleCookie = cookies.find(c => c.trim().startsWith('user_role='));
   if (roleCookie) {
     return roleCookie.split('=')[1];
   }
-  
+
   return null;
 }
 
@@ -185,12 +185,13 @@ export function hasAnyRole(userRole: string, requiredRoles: string[]): boolean {
 // Retour du chemin de destination basé sur les permissions du rôle
 export function getRedirectPath(role: string): string {
   // Logique de redirection selon le rôle utilisateur
-  // Tous les rôles redirigent vers /dashboard dans cette implémentation
   switch (role) {
     case 'SADMIN':
       return '/dashboard';
     case 'ADMIN':
       return '/dashboard';
+    case 'MANAGER':
+      return '/legislatives-supervision';
     case 'USER':
       return '/dashboard';
     default:

@@ -93,7 +93,7 @@ export function RealtimeMetrics({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl text-primary font-bold">
-            Métriques Temps Réel
+            Statistiques en Temps Réel
           </h2>
           <p className="text-muted-foreground">
             Dernière mise à jour : {formatTimestamp(metrics.timestamp)}
@@ -113,7 +113,7 @@ export function RealtimeMetrics({
       </div>
 
       {/* Métriques principales */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total CELs</CardTitle>
@@ -122,7 +122,7 @@ export function RealtimeMetrics({
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalCels}</div>
             <p className="text-xs text-muted-foreground">
-              Taux:{" "}
+              Taux d'importation:{" "}
               {(
                 metrics.tauxProgression ||
                 metrics.tauxProgressionPersonnel ||
@@ -135,7 +135,7 @@ export function RealtimeMetrics({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avec Import</CardTitle>
+            <CardTitle className="text-sm font-medium">CELs Importées</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -150,7 +150,7 @@ export function RealtimeMetrics({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sans Import</CardTitle>
+            <CardTitle className="text-sm font-medium">CELs En Attente d'Importation</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
@@ -163,7 +163,7 @@ export function RealtimeMetrics({
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Erreurs</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -176,7 +176,7 @@ export function RealtimeMetrics({
               {metrics.celsParStatut.error} critiques
             </p>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Métriques des départements */}
@@ -236,7 +236,7 @@ export function RealtimeMetrics({
       )}
 
       {/* Activité récente */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Activité Récente (24h)</CardTitle>
           <CardDescription>Activité des dernières 24 heures</CardDescription>
@@ -244,7 +244,7 @@ export function RealtimeMetrics({
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             {/* ✅ ADAPTATION : Utilise imports24h (USER) ou importsAujourdhui (ADMIN/SADMIN) */}
-            <div className="flex items-center space-x-2">
+            {/* <div className="flex items-center space-x-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="text-sm font-medium">Imports (24h)</span>
               <Badge variant="secondary">
@@ -252,9 +252,9 @@ export function RealtimeMetrics({
                   metrics.activiteRecente.importsAujourdhui ||
                   0}
               </Badge>
-            </div>
+            </div> */}
             {/* ✅ ADAPTATION : Publications (ADMIN/SADMIN uniquement) */}
-            {metrics.activiteRecente.publicationsAujourdhui !== undefined && (
+            {/* {metrics.activiteRecente.publicationsAujourdhui !== undefined && (
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium">
@@ -264,9 +264,9 @@ export function RealtimeMetrics({
                   {metrics.activiteRecente.publicationsAujourdhui}
                 </Badge>
               </div>
-            )}
+            )} */}
             {/* ✅ ADAPTATION : Connexions (ADMIN/SADMIN uniquement) */}
-            {metrics.activiteRecente.connexionsAujourdhui !== undefined && (
+            {/* {metrics.activiteRecente.connexionsAujourdhui !== undefined && (
               <div className="flex items-center space-x-2">
                 <Activity className="h-4 w-4 text-purple-600" />
                 <span className="text-sm font-medium">
@@ -279,7 +279,7 @@ export function RealtimeMetrics({
             )}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Imports en cours */}
       {/* ✅ ADAPTATION : Utilise count/imports (nouveau format) ou nombre/liste (ancien format) */}

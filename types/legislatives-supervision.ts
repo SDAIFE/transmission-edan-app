@@ -189,8 +189,34 @@ export interface SupervisionStatsProps {
   data: SupervisionStatsResponse;
 }
 
+// ============================================
+// 5. Liste des CELs par région et circonscription
+// ============================================
 
+export interface CelItem {
+  codeCel: string;
+  libelleCel: string | null;
+  etatResultat: string | null; // "I", "PUBLISHED", "CANCELLED", ou null
+}
 
+export interface CirconscriptionCels {
+  codeCirconscription: string;
+  libelleCirconscription: string | null;
+  cels: CelItem[];
+}
 
+export interface RegionCels {
+  codeRegion: string;
+  libelleRegion: string | null;
+  circonscriptions: CirconscriptionCels[];
+}
+
+export interface CelsByRegionResponse {
+  regions: RegionCels[];
+  totalCels: number;
+}
+
+// Type pour le statut d'état d'une CEL
+export type CelEtatResultat = "I" | "PUBLISHED" | "CANCELLED" | null;
 
 

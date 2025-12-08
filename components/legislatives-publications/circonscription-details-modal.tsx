@@ -126,6 +126,7 @@ export function CirconscriptionDetailsModal({
   onClose,
   codeCirconscription,
   isUser = false,
+  publicationStatus,
   onPublish,
   onCancel,
 }: CirconscriptionDetailsModalProps) {
@@ -655,7 +656,8 @@ export function CirconscriptionDetailsModal({
                       Publier
                     </Button>
                   )}
-                  {onCancel && (
+                  {/* Afficher le bouton "Annuler la publication" uniquement si la circonscription est publiée */}
+                  {onCancel && publicationStatus === "1" && (
                     <Button
                       onClick={handleCancelClick}
                       variant="destructive"

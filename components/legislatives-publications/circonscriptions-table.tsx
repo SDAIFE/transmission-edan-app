@@ -19,7 +19,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   MoreHorizontal,
   Eye,
@@ -29,10 +35,12 @@ import {
   Building2,
   Calendar,
   Hash,
-  TrendingUp,
   AlertCircle,
 } from "lucide-react";
-import type { CirconscriptionsTableProps, PublicationStatus } from "@/types/legislatives-publications";
+import type {
+  CirconscriptionsTableProps,
+  PublicationStatus,
+} from "@/types/legislatives-publications";
 
 export function CirconscriptionsTable({
   circonscriptions = [],
@@ -43,7 +51,9 @@ export function CirconscriptionsTable({
   onCancel,
   pagination,
 }: CirconscriptionsTableProps) {
-  const [selectedCirconscription, setSelectedCirconscription] = useState<string | null>(null);
+  const [selectedCirconscription, setSelectedCirconscription] = useState<
+    string | null
+  >(null);
 
   // Protection contre undefined
   const safeCirconscriptions = circonscriptions || [];
@@ -51,7 +61,8 @@ export function CirconscriptionsTable({
   const formatDate = (dateString: Date | string) => {
     if (!dateString) return "Date inconnue";
 
-    const date = typeof dateString === "string" ? new Date(dateString) : dateString;
+    const date =
+      typeof dateString === "string" ? new Date(dateString) : dateString;
     if (isNaN(date.getTime())) {
       return "Date invalide";
     }
@@ -93,7 +104,7 @@ export function CirconscriptionsTable({
   };
 
   // Vérifier si une circonscription peut être publiée
-  const canPublish = (circ: typeof circonscriptions[0]) => {
+  const canPublish = (circ: (typeof circonscriptions)[0]) => {
     return (
       circ.importedCels === circ.totalCels &&
       circ.totalCels > 0 &&
@@ -102,7 +113,7 @@ export function CirconscriptionsTable({
   };
 
   // Vérifier si une circonscription est publiée
-  const isPublished = (circ: typeof circonscriptions[0]) => {
+  const isPublished = (circ: (typeof circonscriptions)[0]) => {
     return circ.publicationStatus === "1";
   };
 
@@ -118,12 +129,17 @@ export function CirconscriptionsTable({
       <Card>
         <CardHeader>
           <CardTitle>Circonscriptions</CardTitle>
-          <CardDescription>Chargement des circonscriptions&hellip;</CardDescription>
+          <CardDescription>
+            Chargement des circonscriptions&hellip;
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center space-x-4 p-4 border rounded">
+              <div
+                key={index}
+                className="flex items-center space-x-4 p-4 border rounded"
+              >
                 <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
                 <div className="space-y-2 flex-1">
                   <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
@@ -161,7 +177,9 @@ export function CirconscriptionsTable({
         {safeCirconscriptions.length === 0 ? (
           <div className="text-center py-8">
             <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">Aucune circonscription trouvée</h3>
+            <h3 className="text-lg font-medium">
+              Aucune circonscription trouvée
+            </h3>
             <p className="text-muted-foreground">
               Aucune circonscription n&apos;a été trouvée pour le moment.
             </p>
@@ -170,13 +188,27 @@ export function CirconscriptionsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Circonscription</TableHead>
-                <TableHead>Total CELs</TableHead>
-                <TableHead>Importées</TableHead>
-                <TableHead>En Attente</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Dernière MAJ</TableHead>
-                <TableHead className="w-[50px]">Actions</TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  Circonscription
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  Total CELs
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  Importées
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  En Attente
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  Statut
+                </TableHead>
+                <TableHead className="bg-gray-100 dark:bg-gray-800 text-black">
+                  Dernière MAJ
+                </TableHead>
+                <TableHead className="w-[50px] bg-gray-100 dark:bg-gray-800 text-black">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -208,7 +240,8 @@ export function CirconscriptionsTable({
                             <span>Code: {circ.codeCirconscription}</span>
                             {circ.nombreSieges && (
                               <Badge variant="outline" className="text-xs">
-                                {circ.nombreSieges} siège{circ.nombreSieges > 1 ? "s" : ""}
+                                {circ.nombreSieges} siège
+                                {circ.nombreSieges > 1 ? "s" : ""}
                               </Badge>
                             )}
                           </div>
@@ -234,12 +267,16 @@ export function CirconscriptionsTable({
                       <div className="flex items-center gap-1 text-sm">
                         <RefreshCw
                           className={`h-3 w-3 ${
-                            circ.pendingCels > 0 ? "text-yellow-600" : "text-green-600"
+                            circ.pendingCels > 0
+                              ? "text-yellow-600"
+                              : "text-green-600"
                           }`}
                         />
                         <span
                           className={
-                            circ.pendingCels > 0 ? "text-yellow-600" : "text-green-600"
+                            circ.pendingCels > 0
+                              ? "text-yellow-600"
+                              : "text-green-600"
                           }
                         >
                           {circ.pendingCels}
@@ -263,7 +300,9 @@ export function CirconscriptionsTable({
                       </div>
                     </TableCell>
 
-                    <TableCell>{getStatusBadge(circ.publicationStatus)}</TableCell>
+                    <TableCell>
+                      {getStatusBadge(circ.publicationStatus)}
+                    </TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -299,20 +338,23 @@ export function CirconscriptionsTable({
                           {/* Actions de publication/annulation (ADMIN/SADMIN uniquement) */}
                           {!isUser && (
                             <>
-                              {canPublish(circ) && !isPublished(circ) && onPublish && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleAction(
-                                      () => onPublish(circ.codeCirconscription),
-                                      circ.codeCirconscription
-                                    )
-                                  }
-                                  className="text-green-600"
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Publier
-                                </DropdownMenuItem>
-                              )}
+                              {canPublish(circ) &&
+                                !isPublished(circ) &&
+                                onPublish && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleAction(
+                                        () =>
+                                          onPublish(circ.codeCirconscription),
+                                        circ.codeCirconscription
+                                      )
+                                    }
+                                    className="text-green-600"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Publier
+                                  </DropdownMenuItem>
+                                )}
                               {isPublished(circ) && onCancel && (
                                 <DropdownMenuItem
                                   onClick={() =>
@@ -377,4 +419,3 @@ export function CirconscriptionsTable({
     </Card>
   );
 }
-

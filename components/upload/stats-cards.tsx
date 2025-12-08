@@ -1,16 +1,14 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Upload, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle,
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Upload,
+  CheckCircle,
+  Clock,
   TrendingUp,
-  TrendingDown
-} from 'lucide-react';
-import type { ImportStats, StatsCardProps } from '@/types/upload';
+  TrendingDown,
+} from "lucide-react";
+import type { ImportStats, StatsCardProps } from "@/types/upload";
 
 interface StatsCardsProps {
   stats: ImportStats | null;
@@ -49,36 +47,41 @@ export function StatsCards({ stats, loading = false }: StatsCardsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Permissions insuffisantes</p>
+            <p className="text-xs text-muted-foreground">
+              Permissions insuffisantes
+            </p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // Calculer les CELs en attente : Total - Importées
+  const celsEnAttente = Math.max(0, stats.totalImports - stats.importsReussis);
+
   const cards: StatsCardProps[] = [
     {
-      title: 'Total CELs',
+      title: "Total CELs",
       value: stats.totalImports,
       icon: <Upload className="h-4 w-4 text-blue-600" />,
-      color: 'default'
+      color: "default",
     },
     {
-      title: 'CELs Importées',
+      title: "CELs Importées",
       value: stats.importsReussis, // I + P
       icon: <CheckCircle className="h-4 w-4 text-green-600" />,
-      color: 'success',
+      color: "success",
       trend: {
         value: stats.tauxReussite,
-        isPositive: true
-      }
+        isPositive: true,
+      },
     },
     {
-      title: 'CELs en Attente',
-      value: stats.importsEnCours, // statut N
+      title: "CELs en Attente",
+      value: celsEnAttente, // Calculé : Total - Importées
       icon: <Clock className="h-4 w-4 text-yellow-600" />,
-      color: 'warning'
-    }
+      color: "warning",
+    },
   ];
 
   return (
@@ -90,26 +93,13 @@ export function StatsCards({ stats, loading = false }: StatsCardsProps) {
   );
 }
 
-function StatsCard({ 
-  title, 
-  value, 
-  icon, 
-  color = 'default', 
-  trend 
+function StatsCard({
+  title,
+  value,
+  icon,
+  color: _color = "default",
+  trend,
 }: StatsCardProps) {
-  const getColorClasses = () => {
-    switch (color) {
-      case 'success':
-        return 'text-green-600';
-      case 'warning':
-        return 'text-yellow-600';
-      case 'error':
-        return 'text-red-600';
-      default:
-        return 'text-blue-600';
-    }
-  };
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

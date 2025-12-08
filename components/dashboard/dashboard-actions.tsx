@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, Map, Users, CheckSquare } from "lucide-react";
+import { Upload, FileText, Map, Users, CheckSquare, Eye } from "lucide-react";
 import Link from "next/link";
 import type { UserResponseDto } from "@/types/auth";
 
@@ -28,15 +28,16 @@ export function DashboardActions({ user }: DashboardActionsProps) {
       href: "/upload",
       iconColor: "text-blue-600",
       iconSize: "h-6 w-6",
-    },
-    {
-      title: "Résultats",
-      description: "Consulter les résultats électoraux",
-      icon: Map,
-      href: "/results",
-      iconColor: "text-green-600",
-      iconSize: "h-6 w-6",
-    },
+    }
+    // ,
+    // {
+    //   title: "Résultats",
+    //   description: "Consulter les résultats électoraux",
+    //   icon: Map,
+    //   href: "/results",
+    //   iconColor: "text-green-600",
+    //   iconSize: "h-6 w-6",
+    // },
   ];
 
   // Actions spécifiques selon le rôle
@@ -72,14 +73,14 @@ export function DashboardActions({ user }: DashboardActionsProps) {
           iconColor: "text-red-600",
           iconSize: "h-6 w-6",
         },
-        // {
-        //   title: 'Rapports',
-        //   description: 'Consulter les rapports électoraux',
-        //   icon: BarChart3,
-        //   href: '/rapports',
-        //   iconColor: 'text-indigo-600',
-        //   iconSize: 'h-6 w-6'
-        // }
+          {
+            title: "Supervision",
+            description: "Superviser les résultats électoraux",
+            icon: Eye,
+            href: "/legislatives-supervision",
+            iconColor: "text-indigo-600",
+            iconSize: "h-6 w-6",
+          }
       ];
     }
     return [];
@@ -111,7 +112,7 @@ export function DashboardActions({ user }: DashboardActionsProps) {
                   {action.title === "Consolidation" && "Consolider les données"}
                   {action.title === "Résultats" && "Voir les résultats"}
                   {action.title === "Utilisateurs" && "Gérer les utilisateurs"}
-                  {action.title === "Rapports" && "Voir les rapports"}
+                  {action.title === "Supervision" && "Superviser les résultats"}
                 </Link>
               </Button>
             </CardContent>

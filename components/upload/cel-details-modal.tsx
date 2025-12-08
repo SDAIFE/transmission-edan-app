@@ -988,7 +988,7 @@ export function CelDetailsModal({
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.text(
-        `SOUS-PREFECTURE / COUMMUNE - ${importData.codeCellule} ${importData.nomFichier}`,
+        `SOUS-PREFECTURE / COUMMUNE - ${importData.codeCellule} ${importData.libelleCellule}`,
         60,
         38
       );

@@ -75,24 +75,24 @@ export function LegislativeStatsSection({
       icon: <Clock className="h-4 w-4 text-yellow-600" />,
       color: "warning" as const,
     },
-    {
-      title: "Total CELs",
-      value: stats.totalCels,
-      icon: <BarChart3 className="h-4 w-4 text-purple-600" />,
-      color: "default" as const,
-    },
-    {
-      title: "CELs Importées",
-      value: stats.importedCels,
-      icon: <CheckCircle className="h-4 w-4 text-green-600" />,
-      color: "success" as const,
-    },
-    {
-      title: "CELs en Attente",
-      value: stats.pendingCels,
-      icon: <Clock className="h-4 w-4 text-yellow-600" />,
-      color: "warning" as const,
-    },
+    // {
+    //   title: "Total CELs",
+    //   value: stats.totalCels,
+    //   icon: <BarChart3 className="h-4 w-4 text-purple-600" />,
+    //   color: "default" as const,
+    // },
+    // {
+    //   title: "CELs Importées",
+    //   value: stats.importedCels,
+    //   icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+    //   color: "success" as const,
+    // },
+    // {
+    //   title: "CELs en Attente",
+    //   value: stats.pendingCels,
+    //   icon: <Clock className="h-4 w-4 text-yellow-600" />,
+    //   color: "warning" as const,
+    // },
   ];
 
   return (

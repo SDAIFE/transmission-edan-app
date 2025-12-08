@@ -157,7 +157,7 @@ export function MetricsDashboard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold">Métriques des Circonscriptions</h2>
+          <h2 className="text-2xl font-bold">Statistiques des Circonscriptions</h2>
         </div>
 
         <div className="flex items-center gap-4">

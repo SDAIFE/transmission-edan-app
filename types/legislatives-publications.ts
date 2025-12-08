@@ -181,6 +181,7 @@ export interface CirconscriptionDetailsModalProps {
   onClose: () => void;
   codeCirconscription: string;
   isUser?: boolean; // true pour USER, false pour ADMIN/SADMIN
+  publicationStatus?: PublicationStatus; // Statut de publication de la circonscription
   onPublish?: (codeCirconscription: string) => Promise<void>;
   onCancel?: (codeCirconscription: string) => Promise<void>;
 }

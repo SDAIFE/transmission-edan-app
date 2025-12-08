@@ -360,6 +360,11 @@ export function LegislativesPublicationsPageContent({
           onClose={handleCloseDetailsModal}
           codeCirconscription={selectedCodeCirconscription}
           isUser={isUser}
+          publicationStatus={
+            circonscriptions.find(
+              (c) => c.codeCirconscription === selectedCodeCirconscription
+            )?.publicationStatus
+          }
           onPublish={!isUser ? handlePublish : undefined}
           onCancel={!isUser ? handleCancel : undefined}
         />
