@@ -331,9 +331,10 @@ export interface CelData {
   // Statut
   statutSuppressionBv: string | null; // Statut suppression BV ("OK" | "NOK" | null)
 
-  // Scores des candidats (colonnes dynamiques)
-  // Les clés sont les NUM_DOS des candidats (format: "U-02108", "U-02122", etc.)
-  [numDos: string]: number | string | null;
+  // Scores des candidats/listes (colonnes dynamiques selon le nombre de sièges)
+  // Pour siège unique (NB_SIEGE = 1) : clés = "NOM PRENOM" (ex: "DUPONT Jean")
+  // Pour sièges multiples (NB_SIEGE > 1) : clés = INT_LST_DOS (ex: "Liste Union pour le Progrès")
+  [candidatOrListe: string]: number | string | null | undefined;
 }
 
 export interface CelMetrics {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -117,6 +117,27 @@ interface CelDetailsModalProps {
   importData: ImportData | null;
 }
 
+// ✅ Liste des champs fixes (non-dynamiques) selon la documentation
+const FIXED_FIELDS = [
+  "id",
+  "codeCellule",
+  "ordre",
+  "referenceLieuVote",
+  "libelleLieuVote",
+  "numeroBureauVote",
+  "populationHommes",
+  "populationFemmes",
+  "populationTotale",
+  "votantsHommes",
+  "votantsFemmes",
+  "totalVotants",
+  "tauxParticipation",
+  "bulletinsNuls",
+  "suffrageExprime",
+  "bulletinsBlancs",
+  "statutSuppressionBv",
+];
+
 export function CelDetailsModal({
   isOpen,
   onClose,
@@ -193,48 +214,113 @@ export function CelDetailsModal({
     };
   }, []);
 
-  // ✅ Extraire les colonnes de candidats dynamiquement selon la documentation
+  // ✅ Fonction helper pour identifier si une clé est un champ fixe
+  const isFixedField = useCallback((key: string): boolean => {
+    return FIXED_FIELDS.includes(key);
+  }, []);
+
+  // ✅ Fonction pour détecter le type de circonscription (siège unique vs sièges multiples)
+  const detectElectionType = useCallback(
+    (data: CelData[]): "siege-unique" | "sieges-multiples" | null => {
+      if (!data || data.length === 0) return null;
+
+      const firstRow = data[0];
+      const dynamicKeys = Object.keys(firstRow).filter(
+        (key) => !isFixedField(key)
+      );
+
+      if (dynamicKeys.length === 0) return null;
+
+      // Détecter le format: siège unique = "NOM PRENOM" (format: NOM en majuscules + espace + Prénom avec casse mixte)
+      // Exemples: "DUPONT Jean", "MARTIN Marie", "KOUASSI Koffi"
+      // Sièges multiples = intitulés de liste (commencent souvent par "Liste" ou sont plus longs)
+      // Pattern: NOM (tout en majuscules) + espace + Prénom (commence par majuscule, peut contenir minuscules)
+      const siegeUniquePattern =
+        /^[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ][A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ\s'-]+\s+[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ][A-Za-zÀ-ÿ\s'-]+$/;
+
+      // Vérifier si les clés correspondent au format "NOM PRENOM"
+      const hasSiegeUniqueFormat = dynamicKeys.some((key) => {
+        // Format "NOM PRENOM": au moins 2 mots, le premier en majuscules, le second commence par majuscule
+        const words = key.trim().split(/\s+/);
+        if (words.length < 2) return false;
+
+        // Vérifier que le premier mot (NOM) est en majuscules
+        const nom = words[0];
+        const isNomUppercase =
+          /^[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ\s'-]+$/.test(nom);
+
+        // Vérifier que le deuxième mot (Prénom) commence par une majuscule
+        const prenom = words[1];
+        const isPrenomValid = /^[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ]/.test(
+          prenom
+        );
+
+        return isNomUppercase && isPrenomValid && siegeUniquePattern.test(key);
+      });
+
+      // Si on trouve des clés au format "NOM PRENOM", c'est un siège unique
+      if (hasSiegeUniqueFormat) {
+        return "siege-unique";
+      }
+
+      // Sinon, c'est probablement des sièges multiples (intitulés de liste)
+      // Les intitulés de liste peuvent commencer par "Liste" ou être des noms de liste complets
+      return "sieges-multiples";
+    },
+    [isFixedField]
+  );
+
+  // ✅ Extraire les colonnes de candidats/listes dynamiquement selon la documentation
   const candidateColumns = useMemo(() => {
     if (!celData?.data || celData.data.length === 0) return [];
 
-    // Extraire les clés qui correspondent aux NUM_DOS des candidats
-    // Format: "U-02108", "U-02122", etc. ou "XX-XXXXX" (selon la doc)
     const firstRow = celData.data[0];
-    return Object.keys(firstRow).filter(
-      (key) => key.startsWith("U-") || key.match(/^\d{2}-\d{5}$/) !== null
-    );
-  }, [celData]);
+
+    // Filtrer les clés pour ne garder que les colonnes dynamiques (scores)
+    // Exclure tous les champs fixes
+    return Object.keys(firstRow).filter((key) => !isFixedField(key));
+  }, [celData, isFixedField]);
+
+  // ✅ Détecter le type d'élection (siège unique vs sièges multiples)
+  const electionType = useMemo(() => {
+    if (!celData?.data) return null;
+    return detectElectionType(celData.data);
+  }, [celData, detectElectionType]);
 
   // ✅ Calculer les vainqueurs et égalités à partir de la ligne de totaux
   const winnersAndTies = useMemo(() => {
-    if (!celData?.data || celData.data.length === 0 || candidateColumns.length === 0) {
+    if (
+      !celData?.data ||
+      celData.data.length === 0 ||
+      candidateColumns.length === 0
+    ) {
       return { winners: [], isTie: false };
     }
 
-    // Calculer les totaux des scores de chaque candidat
+    // Calculer les totaux des scores de chaque candidat/liste
     const candidateTotals = new Map<string, number>();
-    
+
     celData.data.forEach((item) => {
-      candidateColumns.forEach((numDos) => {
-        const value = item[numDos];
+      candidateColumns.forEach((candidateKey) => {
+        const value = item[candidateKey];
         const numValue =
           typeof value === "number"
             ? value
             : parseFloat(String(value || 0)) || 0;
         candidateTotals.set(
-          numDos,
-          (candidateTotals.get(numDos) || 0) + numValue
+          candidateKey,
+          (candidateTotals.get(candidateKey) || 0) + numValue
         );
       });
     });
 
-    // Construire la liste des candidats avec leurs scores totaux
+    // Construire la liste des candidats/listes avec leurs scores totaux
     const candidates = Array.from(candidateTotals.entries())
-      .map(([numDos, score]) => ({
-        numDos,
+      .map(([candidateKey, score]) => ({
+        candidateKey,
         score,
       }))
-      .filter((c) => c.score > 0); // Filtrer les candidats avec score > 0
+      .filter((c) => c.score > 0); // Filtrer les candidats/listes avec score > 0
 
     if (candidates.length === 0) {
       return { winners: [], isTie: false };
@@ -245,7 +331,7 @@ export function CelDetailsModal({
     const winners = candidates.filter((c) => c.score === maxScore);
 
     return {
-      winners: winners.map((w) => w.numDos),
+      winners: winners.map((w) => w.candidateKey),
       isTie: winners.length > 1,
     };
   }, [celData, candidateColumns]);
@@ -782,11 +868,46 @@ export function CelDetailsModal({
           </div>
         ),
       },
-      // ✅ Colonnes dynamiques pour les candidats avec badges ELU/EGALITE
-      ...candidateColumns.map((numDos) => {
-        const isWinner = winnersAndTies.winners.includes(numDos);
+      // ✅ Colonnes dynamiques pour les candidats/listes avec badges ELU/EGALITE
+      ...candidateColumns.map((candidateKey) => {
+        const isWinner = winnersAndTies.winners.includes(candidateKey);
         const isTie = winnersAndTies.isTie;
-        
+
+        // Formater l'affichage selon le type d'élection
+        const displayTitle = () => {
+          if (electionType === "siege-unique") {
+            // Format "NOM PRENOM" - afficher tel quel mais avec formatage amélioré
+            const parts = candidateKey.split(/\s+/);
+            if (parts.length >= 2) {
+              const nom = parts[0];
+              const prenom = parts.slice(1).join(" ");
+              return (
+                <div className="text-center">
+                  <div className="text-xs font-bold">{nom}</div>
+                  <div className="text-xs text-muted-foreground">{prenom}</div>
+                </div>
+              );
+            }
+            return (
+              <span className="text-xs font-semibold">{candidateKey}</span>
+            );
+          } else if (electionType === "sieges-multiples") {
+            // Sièges multiples - afficher l'intitulé de liste
+            return (
+              <span className="text-xs font-semibold text-center leading-tight">
+                {candidateKey}
+              </span>
+            );
+          } else {
+            // Type non déterminé (null) - afficher tel quel sans formatage spécial
+            return (
+              <span className="text-xs font-semibold text-center">
+                {candidateKey}
+              </span>
+            );
+          }
+        };
+
         return {
           title: (
             <div className="flex flex-col items-center gap-1">
@@ -800,12 +921,12 @@ export function CelDetailsModal({
                   EGALITE
                 </Badge>
               )}
-              <span className="text-xs font-semibold">{numDos}</span>
+              {displayTitle()}
             </div>
           ),
-          dataIndex: numDos,
-          key: numDos,
-          width: 100,
+          dataIndex: candidateKey,
+          key: candidateKey,
+          width: electionType === "siege-unique" ? 100 : 120, // Plus large pour les listes (ou type non déterminé)
           align: "center" as const,
           render: (
             value: number | string | null | undefined,
@@ -820,7 +941,7 @@ export function CelDetailsModal({
                 className={`text-sm font-medium ${
                   String(record.id) === "totals" ? " font-bold" : ""
                 }`}
-                data-index={`score-${numDos}`}
+                data-index={`score-${candidateKey}`}
               >
                 {numValue > 0 ? formatNumber(numValue) : "0"}
               </div>
@@ -831,7 +952,7 @@ export function CelDetailsModal({
     ];
 
     return baseColumns;
-  }, [celData, candidateColumns, winnersAndTies]);
+  }, [celData, candidateColumns, winnersAndTies, electionType]);
 
   // Fonction pour calculer les totaux avec colonnes dynamiques
   const calculateTotals = (data: CelData[]): CelData => {
@@ -864,16 +985,16 @@ export function CelDetailsModal({
         acc.suffrageExprime += parseInt(String(item.suffrageExprime)) || 0;
         acc.bulletinsBlancs += parseInt(String(item.bulletinsBlancs)) || 0;
 
-        // Calculer les totaux pour chaque colonne de candidat (dynamique)
-        candidateColumns.forEach((numDos) => {
-          const value = item[numDos];
+        // Calculer les totaux pour chaque colonne de candidat/liste (dynamique)
+        candidateColumns.forEach((candidateKey) => {
+          const value = item[candidateKey];
           const numValue =
             typeof value === "number"
               ? value
               : parseFloat(String(value || 0)) || 0;
           candidateTotals.set(
-            numDos,
-            (candidateTotals.get(numDos) || 0) + numValue
+            candidateKey,
+            (candidateTotals.get(candidateKey) || 0) + numValue
           );
         });
 
@@ -910,9 +1031,9 @@ export function CelDetailsModal({
       statutSuppressionBv: null,
     };
 
-    // Ajouter les totaux des candidats (colonnes dynamiques)
-    candidateTotals.forEach((total, numDos) => {
-      totalsRow[numDos] = total;
+    // Ajouter les totaux des candidats/listes (colonnes dynamiques)
+    candidateTotals.forEach((total, candidateKey) => {
+      totalsRow[candidateKey] = total;
     });
 
     return totalsRow as CelData;
@@ -1102,16 +1223,36 @@ export function CelDetailsModal({
       // Calculer les pourcentages et déterminer le vainqueur avec colonnes dynamiques
       const totalSuffrages = parseInt(String(totalsRow.suffrageExprime)) || 0;
 
-      // Construire la liste des candidats dynamiquement à partir des colonnes
+      // Construire la liste des candidats/listes dynamiquement à partir des colonnes
       const candidates = candidateColumns
-        .map((numDos) => {
-          const value = totalsRow[numDos];
+        .map((candidateKey) => {
+          const value = totalsRow[candidateKey];
           const score =
             typeof value === "number"
               ? value
               : parseFloat(String(value || 0)) || 0;
+
+          // Formater les lignes d'affichage selon le type d'élection
+          let displayLines: string[];
+          if (electionType === "siege-unique") {
+            // Format "NOM PRENOM" - séparer en deux lignes
+            const parts = candidateKey.split(/\s+/);
+            if (parts.length >= 2) {
+              displayLines = [parts[0], parts.slice(1).join(" ")];
+            } else {
+              displayLines = [candidateKey];
+            }
+          } else if (electionType === "sieges-multiples") {
+            // Sièges multiples - utiliser l'intitulé tel quel (une seule ligne)
+            displayLines = [candidateKey];
+          } else {
+            // Type non déterminé (null) - utiliser tel quel (une seule ligne)
+            displayLines = [candidateKey];
+          }
+
           return {
-            numDos,
+            candidateKey,
+            displayLines, // Lignes séparées pour l'affichage PDF
             score,
             percentage:
               totalSuffrages > 0
@@ -1119,7 +1260,7 @@ export function CelDetailsModal({
                 : "0.00",
           };
         })
-        .filter((c) => c.score > 0); // Filtrer les candidats avec score > 0
+        .filter((c) => c.score > 0); // Filtrer les candidats/listes avec score > 0
 
       // Déterminer le vainqueur ou égalité
       const maxScore =
@@ -1181,32 +1322,60 @@ export function CelDetailsModal({
         doc.setDrawColor(0, 0, 0); // Bordure noire
         doc.rect(x, y, candidateWidth, 50, "S");
 
-        // NUM_DOS du candidat
+        // Nom du candidat/liste
         doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
+        // Taille de police : 8 pour siège unique, 7 pour sièges multiples ou type non déterminé
+        const nameFontSize = electionType === "siege-unique" ? 8 : 7;
+        doc.setFontSize(nameFontSize);
         doc.setFont("helvetica", "bold");
-        const numDosLines = doc.splitTextToSize(
-          candidate.numDos,
-          candidateWidth - 4
-        );
-        doc.text(numDosLines, x + 2, y + 8);
+
+        // Afficher les lignes séparément (déjà formatées selon le type d'élection)
+        // Calculer la hauteur de ligne en fonction de la taille de police (environ 1.2x la taille de police)
+        const lineHeight = nameFontSize * 1.2;
+        let currentY = y + 8;
+
+        candidate.displayLines.forEach((line) => {
+          const wrappedLines = doc.splitTextToSize(line, candidateWidth - 4);
+          // splitTextToSize retourne toujours un tableau, même pour une seule ligne
+          const linesArray = Array.isArray(wrappedLines)
+            ? wrappedLines
+            : [wrappedLines];
+
+          // Afficher chaque ligne retournée et incrémenter currentY pour chaque ligne
+          linesArray.forEach((wrappedLine) => {
+            doc.text(wrappedLine, x + 2, currentY);
+            currentY += lineHeight; // Espacement entre les lignes basé sur la taille de police
+          });
+
+          // Espacement supplémentaire entre les groupes de lignes (entre NOM et Prénom)
+          if (linesArray.length > 0) {
+            currentY += 2; // Petit espacement entre les groupes
+          }
+        });
+
+        // Calculer la position du score dynamiquement en fonction de la hauteur du texte
+        // S'assurer qu'il y a au moins un espace minimum entre le nom et le score
+        const minScoreY = y + 25; // Position minimale pour le score
+        const calculatedScoreY = Math.max(currentY + 3, minScoreY); // Prendre le maximum entre la position calculée et la position minimale
 
         // Score et pourcentage
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(formatNumberForPDF(candidate.score), x + 2, y + 25);
+        doc.text(formatNumberForPDF(candidate.score), x + 2, calculatedScoreY);
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.text("VOIX", x + 2, y + 30);
+        doc.text("VOIX", x + 2, calculatedScoreY + 5);
 
         // Pourcentage
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(`${candidate.percentage}%`, x + 2, y + 38);
+        doc.text(`${candidate.percentage}%`, x + 2, calculatedScoreY + 13);
 
         // Indicateur vainqueur/égalité
         const isWinner = winners.some(
-          (w) => w.numDos === candidate.numDos && w.score === candidate.score
+          (w) =>
+            w.candidateKey === candidate.candidateKey &&
+            w.score === candidate.score
         );
         if (isWinner) {
           if (isTie) {
@@ -1414,9 +1583,9 @@ export function CelDetailsModal({
           formatNumberForPDF(bureau.bulletinsBlancs),
         ];
 
-        // Ajouter les colonnes dynamiques des candidats
-        candidateColumns.forEach((numDos) => {
-          const value = bureau[numDos];
+        // Ajouter les colonnes dynamiques des candidats/listes
+        candidateColumns.forEach((candidateKey) => {
+          const value = bureau[candidateKey];
           const numValue =
             typeof value === "number"
               ? value
@@ -1426,13 +1595,6 @@ export function CelDetailsModal({
 
         return baseRow;
       });
-
-      // Construire les en-têtes dynamiques pour les candidats
-      const candidateHeaders = candidateColumns.map((numDos) => ({
-        content: numDos,
-        rowSpan: 2,
-        styles: { halign: "center" as const, valign: "middle" as const },
-      }));
 
       // Calculer la largeur des colonnes en fonction du nombre de candidats
       const baseColumnsCount = 13; // Nombre de colonnes fixes
@@ -1455,6 +1617,33 @@ export function CelDetailsModal({
       // Ajuster la taille de police selon le nombre de colonnes
       const fontSize = totalColumns > 20 ? 6 : totalColumns > 15 ? 7 : 8;
       const cellPadding = totalColumns > 20 ? 1 : 2;
+
+      // Construire les en-têtes dynamiques pour les candidats/listes
+      const candidateHeaders = candidateColumns.map((candidateKey) => {
+        // Formater l'affichage selon le type d'élection
+        let displayName: string | string[] = candidateKey;
+        if (electionType === "siege-unique") {
+          // Format "NOM PRENOM" - afficher sur plusieurs lignes
+          // autoTable gère les tableaux de chaînes comme lignes multiples
+          const parts = candidateKey.split(/\s+/);
+          if (parts.length >= 2) {
+            // Utiliser un tableau pour autoTable (chaque élément = une ligne)
+            displayName = [parts[0], parts.slice(1).join(" ")];
+          }
+        }
+        // Pour sièges multiples ou type non déterminé, utiliser l'intitulé tel quel
+
+        return {
+          content: displayName,
+          rowSpan: 2,
+          styles: {
+            halign: "center" as const,
+            valign: "middle" as const,
+            // Taille de police : fontSize pour siège unique, fontSize - 1 pour sièges multiples ou type non déterminé
+            fontSize: electionType === "siege-unique" ? fontSize : fontSize - 1,
+          },
+        };
+      });
 
       autoTable(doc, {
         startY: 100,
