@@ -311,6 +311,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // 🔄 ÉTAPE 12 : EXÉCUTION DE LA REDIRECTION
           // Redirection avec délai pour laisser l'état se stabiliser
           // Utilisation de router.push() pour naviguer vers la page de destination
+          // Si router.push() échoue, utiliser window.location.href comme fallback
           // if (process.env.NODE_ENV === "development") {
           //   console.log(
           //     "🔐 [AuthContext] Exécution de la redirection vers:",
@@ -318,10 +319,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
           //   );
           // }
 
-          // Délai court pour éviter les conflits de redirection
+          // Délai court pour éviter les conflits de redirection et laisser les cookies se définir
           setTimeout(() => {
-            router.push(redirectPath);
-          }, 100);
+            try {
+              router.push(redirectPath);
+
+              // ✅ CORRECTION PRODUCTION : Vérifier après 500ms si la redirection a fonctionné
+              // Si on est toujours sur /auth/login, forcer la redirection avec window.location
+              setTimeout(() => {
+                if (typeof window !== "undefined") {
+                  const currentPath = window.location.pathname;
+                  if (
+                    currentPath.startsWith("/auth/login") ||
+                    currentPath === "/auth/login"
+                  ) {
+                    // Redirection forcée avec window.location.href
+                    window.location.href = redirectPath;
+                  }
+                }
+              }, 500);
+            } catch (redirectError) {
+              // En cas d'erreur avec router.push(), utiliser window.location.href
+              if (typeof window !== "undefined") {
+                window.location.href = redirectPath;
+              }
+            }
+          }, 200); // Augmenté à 200ms pour laisser plus de temps aux cookies
         }
       } catch (error: unknown) {
         // ✅ AMÉLIORATION : Utiliser le message de l'erreur qui contient déjà le message du backend
