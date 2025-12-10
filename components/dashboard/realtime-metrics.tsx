@@ -93,7 +93,7 @@ export function RealtimeMetrics({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl text-primary font-bold">
-            Statistiques en Temps Réel
+            Statistiques des CELs
           </h2>
           <p className="text-muted-foreground">
             Dernière mise à jour : {formatTimestamp(metrics.timestamp)}

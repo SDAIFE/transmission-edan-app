@@ -27,6 +27,7 @@ function LoginForm() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
   const [isCleaningSession, setIsCleaningSession] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
 
@@ -37,6 +38,13 @@ function LoginForm() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Effacer l'erreur d'authentification quand l'utilisateur modifie les champs
+  const handleInputChange = () => {
+    if (authError) {
+      setAuthError(null);
+    }
+  };
 
   // ✅ CORRECTION : Nettoyer automatiquement les cookies expirés au chargement de la page de login
   useEffect(() => {
@@ -52,11 +60,11 @@ function LoginForm() {
 
           // Si un token existe mais qu'on arrive sur la page de login (probablement expiré)
           if (hasToken && !isAuthenticated) {
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                "🧹 [LoginForm] Nettoyage des cookies expirés détectés..."
-              );
-            }
+            // if (process.env.NODE_ENV === "development") {
+            //   console.log(
+            //     "🧹 [LoginForm] Nettoyage des cookies expirés détectés..."
+            //   );
+            // }
             setIsCleaningSession(true);
             await deleteAuthCookie();
             clearError();
@@ -85,11 +93,11 @@ function LoginForm() {
     if (isAuthenticated) {
       // La redirection est gérée par AuthContext après connexion
       // Pas besoin de redirection ici pour éviter les conflits
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "🔐 [LoginForm] Utilisateur authentifié, redirection gérée par AuthContext"
-        );
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log(
+      //     "🔐 [LoginForm] Utilisateur authentifié, redirection gérée par AuthContext"
+      //   );
+      // }
     }
   }, [isAuthenticated]);
 
@@ -131,6 +139,10 @@ function LoginForm() {
   // Cette fonction est déclenchée par handleSubmit(onSubmit) du formulaire
   const onSubmit = async (data: LoginFormData) => {
     try {
+      // Réinitialiser les erreurs précédentes
+      clearError();
+      setAuthError(null);
+
       // 🔄 ÉTAPE 2 : APPEL DE LA FONCTION LOGIN DU CONTEXTE
       // Appel de la fonction login() depuis useAuth() (AuthContext)
       // Passage des identifiants validés par le schéma Zod
@@ -151,8 +163,27 @@ function LoginForm() {
         return;
       }
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Erreur de connexion";
+      // ✅ AMÉLIORATION : Utiliser directement le message du backend
+      // Le message du backend est déjà extrait par handleApiError dans lib/api/client.ts
+      // Format attendu du backend : { "message": "Email ou mot de passe incorrect", "error": "Unauthorized", "statusCode": 401 }
+      // L'erreur peut être une instance d'Error ou un objet AuthError { message, code, status }
+      let errorMessage = "Erreur de connexion";
+
+      // Vérifier si l'erreur a une propriété message (Error ou AuthError)
+      if (error instanceof Error) {
+        errorMessage = error.message || "Erreur de connexion";
+      } else if (error && typeof error === "object" && "message" in error) {
+        // L'erreur est un objet AuthError { message, code, status }
+        errorMessage =
+          (error as { message: string }).message || "Erreur de connexion";
+      } else {
+        // Fallback si l'erreur n'a pas de structure attendue
+        errorMessage = "Erreur de connexion. Veuillez réessayer.";
+      }
+
+      // Afficher l'erreur dans l'état local pour l'Alert
+      setAuthError(errorMessage);
+      // Afficher également un toast pour plus de visibilité
       toast.error(errorMessage);
     }
   };
@@ -196,8 +227,11 @@ function LoginForm() {
                   id="email"
                   type="email"
                   placeholder="prenom.nom@cei.ci"
-                  {...register("email")}
+                  {...register("email", {
+                    onChange: handleInputChange,
+                  })}
                   disabled={isLoading}
+                  className={authError ? "border-destructive" : ""}
                 />
                 {errors.email && (
                   <p className="text-sm text-destructive">
@@ -214,8 +248,11 @@ function LoginForm() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    {...register("password")}
+                    {...register("password", {
+                      onChange: handleInputChange,
+                    })}
                     disabled={isLoading}
+                    className={authError ? "border-destructive" : ""}
                   />
                   <Button
                     type="button"
@@ -244,9 +281,20 @@ function LoginForm() {
                 )}
               </div>
 
-              {/* Erreur */}
-              {error && (
+              {/* Message d'erreur d'authentification convivial */}
+              {authError && (
+                <Alert variant="destructive" className="border-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="font-medium">
+                    {authError}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Erreur du contexte (fallback) */}
+              {error && !authError && (
                 <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}

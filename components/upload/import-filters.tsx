@@ -28,6 +28,9 @@ export function ImportFilters({
   availableCels,
   imports = [],
 }: ExtendedImportFiltersProps) {
+  // Récupérer l'utilisateur connecté (DOIT être déclaré AVANT tout useEffect qui l'utilise)
+  const { user } = useAuth();
+
   // ✅ CORRECTION : Gérer les CELs séparées par des virgules
   const [selectedCels, setSelectedCels] = useState<string[]>(() => {
     if (filters.codeCellule) {
@@ -50,27 +53,35 @@ export function ImportFilters({
   // Ref pour éviter les appels répétés
   const isInitialMount = useRef(true);
 
-  // Récupérer l'utilisateur connecté
-  const { user } = useAuth();
-
-  // ✅ CORRECTION : Utiliser useMemo pour mémoriser les CELs filtrées et éviter les recalculs
-  const baseCelsFiltered = useMemo(() => {
-    if (user?.role?.code === "USER") {
-      // Pour les utilisateurs USER, ne montrer que leurs CELs attribuées
-      if (user.cellules && user.cellules.length > 0) {
-        // ✅ CORRECTION : Utiliser COD_CEL au lieu de codeCellule
-        const userCelCodes = user.cellules.map((cel) => cel.COD_CEL);
-        return availableCels.filter((cel) =>
-          userCelCodes.includes(cel.codeCellule)
-        );
-      } else {
-        // Si l'utilisateur n'a pas de CELs attribuées, ne montrer aucune CEL
-        return [];
-      }
+  // ✅ DEBUG : Logs pour comprendre le timing du chargement (APRÈS la déclaration de user)
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("📊 [ImportFilters] RENDER - État actuel:", {
+        availableCelsCount: availableCels.length,
+        importsCount: imports.length,
+        userRole: user?.role?.code,
+        userCellulesCount: user?.cellules?.length || 0,
+        timestamp: new Date().toISOString(),
+      });
     }
-    // Pour ADMIN et SADMIN, montrer toutes les CELs
-    return availableCels;
-  }, [user?.role?.code, user?.cellules, availableCels]);
+  }, [
+    availableCels.length,
+    imports.length,
+    user?.role?.code,
+    user?.cellules?.length,
+  ]);
+
+  // ✅ EXPLICATION : availableCels est déjà filtré par le parent (UploadPageContent)
+  // selon le rôle de l'utilisateur. On n'a donc pas besoin de refiltrer ici.
+  // On utilise directement availableCels comme baseCelsFiltered.
+  //
+  // Note : Si availableCels est vide au premier chargement, c'est normal car :
+  // 1. Les données sont chargées de manière asynchrone
+  // 2. Le parent filtre les CELs dans un useEffect qui attend user et allCels
+  // 3. Une fois les données chargées, availableCels sera mis à jour automatiquement
+
+  // ✅ SIMPLIFICATION : Utiliser directement availableCels (déjà filtré par le parent)
+  const baseCelsFiltered = availableCels;
 
   // ✨ Filtrer les CELs selon la circonscription sélectionnée
   const filteredCels = useMemo(() => {
@@ -94,13 +105,65 @@ export function ImportFilters({
     return celsToFilter;
   }, [baseCelsFiltered, selectedCirconscription, imports]);
 
-  // ✨ Extraire les circonscriptions uniques des imports
-  const availableCirconscriptions = useMemo(() => {
+  // ✅ CORRECTION : Utiliser un état local pour forcer le recalcul des circonscriptions
+  const [availableCirconscriptions, setAvailableCirconscriptions] = useState<
+    { codeCirconscription: string; libelleCirconscription: string }[]
+  >([]);
+
+  // ✅ CORRECTION : Créer une clé de dépendance stable pour les imports
+  // ✅ CORRECTION : Utiliser useMemo pour garantir la réactivité
+  const importsKey = useMemo(() => {
+    if (imports.length === 0) return "";
+    return imports
+      .map((i) => `${i.codeCellule}-${i.codeCirconscription || ""}`)
+      .sort()
+      .join(",");
+  }, [imports]);
+
+  // ✅ CORRECTION : Créer une clé de dépendance stable pour user.cellules
+  // ✅ CORRECTION : Utiliser useMemo pour garantir la réactivité
+  const userCelCodesKey = useMemo(() => {
+    if (!user?.cellules || user.cellules.length === 0) return "";
+    return user.cellules
+      .map((c) => c.COD_CEL)
+      .sort()
+      .join(",");
+  }, [user?.cellules]);
+
+  // ✅ CORRECTION : useEffect pour recalculer availableCirconscriptions quand user ou imports changent
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔄 [ImportFilters] Recalcul availableCirconscriptions:", {
+        userRole: user?.role?.code,
+        userCellulesCount: user?.cellules?.length || 0,
+        importsCount: imports.length,
+        hasUser: !!user,
+        importsKey: importsKey.substring(0, 50), // Log partiel pour debug
+      });
+    }
+
+    // ✅ CORRECTION : Si pas d'imports, retourner vide immédiatement
+    if (imports.length === 0) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚠️ [ImportFilters] Pas d'imports disponibles");
+      }
+      setAvailableCirconscriptions([]);
+      return;
+    }
+
     const uniqueCirconscriptions = new Map<string, string>();
 
     if (user?.role?.code === "USER") {
       // Pour USER : Uniquement les circonscriptions des imports de ses CELs
       const userCelCodes = user.cellules?.map((cel) => cel.COD_CEL) || [];
+
+      if (userCelCodes.length === 0) {
+        if (process.env.NODE_ENV === "development") {
+          console.log("⚠️ [ImportFilters] USER sans CELs attribuées");
+        }
+        setAvailableCirconscriptions([]);
+        return;
+      }
 
       imports.forEach((importData) => {
         // Vérifier si cet import appartient à une CEL de l'utilisateur
@@ -131,7 +194,7 @@ export function ImportFilters({
     }
 
     // Convertir en tableau et trier par libellé
-    return Array.from(uniqueCirconscriptions.entries())
+    const result = Array.from(uniqueCirconscriptions.entries())
       .map(([codeCirconscription, libelleCirconscription]) => ({
         codeCirconscription,
         libelleCirconscription,
@@ -139,7 +202,16 @@ export function ImportFilters({
       .sort((a, b) =>
         a.libelleCirconscription.localeCompare(b.libelleCirconscription)
       );
-  }, [user?.role?.code, user?.cellules, imports]);
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("✅ [ImportFilters] Circonscriptions calculées:", {
+        count: result.length,
+        circonscriptions: result.map((c) => c.libelleCirconscription),
+      });
+    }
+
+    setAvailableCirconscriptions(result);
+  }, [user, user?.role?.code, userCelCodesKey, imports, importsKey]);
 
   // ✨ Décocher les CELs qui ne sont plus dans la circonscription filtrée
   useEffect(() => {

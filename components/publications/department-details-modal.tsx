@@ -144,22 +144,22 @@ export function DepartmentDetailsModal({
 
   const loadDepartmentData = useCallback(async () => {
     if (!departmentData) {
-      console.warn("⚠️ [DepartmentDetailsModal] Pas de departmentData fourni");
+      // console.warn("⚠️ [DepartmentDetailsModal] Pas de departmentData fourni");
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      console.warn(
-        "🔄 [DepartmentDetailsModal] Chargement des données pour:",
-        departmentData.codeDepartement
-      );
+      // console.warn(
+      //   "🔄 [DepartmentDetailsModal] Chargement des données pour:",
+      //   departmentData.codeDepartement
+      // );
 
       const data = await publicationsApi.getDepartmentData(
         departmentData.codeDepartement
       );
-      console.warn("📥 [DepartmentDetailsModal] Données reçues:", data);
+      // console.warn("📥 [DepartmentDetailsModal] Données reçues:", data);
 
       // ✅ CORRECTION : Support des communes (entities) et départements (departments)
       const entityData = data?.entities?.[0] || data?.departments?.[0];
@@ -167,25 +167,27 @@ export function DepartmentDetailsModal({
       if (entityData) {
         setDepartmentAggregatedData(entityData);
       } else {
-        console.error(
-          "❌ [DepartmentDetailsModal] Aucune donnée trouvée dans la réponse:",
-          data
-        );
+        // console.error(
+        //   "❌ [DepartmentDetailsModal] Aucune donnée trouvée dans la réponse:",
+        //   data
+        // );
         setError("Aucune donnée trouvée pour ce département");
       }
     } catch (err: unknown) {
-      console.error(
-        "❌ [DepartmentDetailsModal] Erreur lors du chargement:",
-        err
-      );
-      console.error("❌ [DepartmentDetailsModal] Détails de l'erreur:", {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-      });
-      setError(
-        (err as Error)?.message || "Erreur lors du chargement des données"
-      );
+      // console.error(
+      //   "❌ [DepartmentDetailsModal] Erreur lors du chargement:",
+      //   err
+      // );
+      // console.error("❌ [DepartmentDetailsModal] Détails de l'erreur:", {
+      //   message: err instanceof Error ? err.message : 'Erreur inconnue',
+      //   response: (err as { response?: { data?: unknown } })?.response?.data,
+      //   status: (err as { response?: { status?: number } })?.response?.status,
+      // });
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erreur lors du chargement des données";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -195,10 +197,10 @@ export function DepartmentDetailsModal({
     if (isOpen && departmentData) {
       loadDepartmentData();
     } else {
-      console.warn("⚠️ [DepartmentDetailsModal] Conditions non remplies:", {
-        isOpen,
-        hasDepartmentData: !!departmentData,
-      });
+      // console.warn("⚠️ [DepartmentDetailsModal] Conditions non remplies:", {
+      //   isOpen,
+      //   hasDepartmentData: !!departmentData,
+      // });
     }
   }, [isOpen, departmentData, loadDepartmentData]);
 
@@ -258,16 +260,16 @@ export function DepartmentDetailsModal({
     if (isDiaspora) {
       const canPublish = departmentData.importedCels >= 18;
       if (process.env.NODE_ENV === "development") {
-        console.warn(
-          "🔍 [DepartmentDetailsModal] Département 999 (DIASPORA):",
-          {
-            codeDepartement: departmentData.codeDepartement,
-            importedCels: departmentData.importedCels,
-            pendingCels: departmentData.pendingCels,
-            totalCels: departmentData.totalCels,
-            canPublish,
-          }
-        );
+        // console.warn(
+        //   "🔍 [DepartmentDetailsModal] Département 999 (DIASPORA):",
+        //   {
+        //     codeDepartement: departmentData.codeDepartement,
+        //     importedCels: departmentData.importedCels,
+        //     pendingCels: departmentData.pendingCels,
+        //     totalCels: departmentData.totalCels,
+        //     canPublish,
+        //   }
+        // );
       }
       return canPublish;
     }
@@ -356,14 +358,14 @@ export function DepartmentDetailsModal({
         }
       );
 
-      const result = response.data;
+      const _result = response.data;
 
-      console.warn("✅ Fichier consolidé uploadé avec succès:", {
-        file: selectedFile.name,
-        department: departmentData.libelleDepartement,
-        size: selectedFile.size,
-        result,
-      });
+      // console.warn("✅ Fichier consolidé uploadé avec succès:", {
+      //   file: selectedFile.name,
+      //   department: departmentData.libelleDepartement,
+      //   size: selectedFile.size,
+      //   result,
+      // });
 
       // Message de succès
       setUploadMessage({
@@ -385,28 +387,30 @@ export function DepartmentDetailsModal({
         onClose();
       }, 2000);
     } catch (error: unknown) {
-      console.error("❌ Erreur lors de l'upload:", error);
+      // console.error("❌ Erreur lors de l'upload:", error);
 
       let errorMessage = "Une erreur inattendue s'est produite";
 
-      if (error.response) {
-        // Erreur de réponse du serveur
-        const errorResponse = error as {
-          response?: {
-            data?: { message?: string; error?: string };
-            status?: number;
-          };
+      const errorObj = error as {
+        response?: {
+          data?: { message?: string; error?: string };
+          status?: number;
         };
+        request?: unknown;
+      };
+
+      if (errorObj.response) {
+        // Erreur de réponse du serveur
         errorMessage =
-          errorResponse.response?.data?.message ||
-          errorResponse.response?.data?.error ||
-          `Erreur serveur (${errorResponse.response?.status})`;
-      } else if (error.request) {
+          errorObj.response?.data?.message ||
+          errorObj.response?.data?.error ||
+          `Erreur serveur (${errorObj.response?.status})`;
+      } else if (errorObj.request) {
         // Pas de réponse du serveur
         errorMessage = "Pas de réponse du serveur. Vérifiez votre connexion.";
       } else {
         // Autre erreur
-        errorMessage = (error as Error)?.message || errorMessage;
+        errorMessage = error instanceof Error ? error.message : errorMessage;
       }
 
       // Message d'erreur
@@ -903,8 +907,8 @@ export function DepartmentDetailsModal({
 
         // Ajouter l'image du logo (position: x=14, y=10, taille: 40x30)
         doc.addImage(logoDataUrl, "WEBP", 14, 10, 30, 30);
-      } catch (error) {
-        console.warn("Impossible de charger le logo CEI:", error);
+      } catch (_error) {
+        // console.warn("Impossible de charger le logo CEI:", _error);
       }
 
       // En-tête du document (décalé à droite pour laisser place au logo)
@@ -1144,11 +1148,11 @@ export function DepartmentDetailsModal({
             15,
             15
           );
-        } catch (error) {
-          console.warn(
-            `Impossible de charger le logo de ${candidate.name}:`,
-            error
-          );
+        } catch (_error) {
+          // console.warn(
+          //   `Impossible de charger le logo de ${candidate.name}:`,
+          //   error
+          // );
         }
 
         // Photo du candidat
@@ -1171,11 +1175,11 @@ export function DepartmentDetailsModal({
             25,
             30
           );
-        } catch (error) {
-          console.warn(
-            `Impossible de charger la photo de ${candidate.name}:`,
-            error
-          );
+        } catch (_error) {
+          // console.warn(
+          //   `Impossible de charger la photo de ${candidate.name}:`,
+          //   error
+          // );
         }
 
         // Nom du candidat et parti
@@ -1242,8 +1246,8 @@ export function DepartmentDetailsModal({
           new Date().toISOString().split("T")[0]
         }.pdf`
       );
-    } catch (error) {
-      console.error("Erreur lors de l'export PDF avec images:", error);
+    } catch (_error) {
+      // console.error("Erreur lors de l'export PDF avec images:", error);
     } finally {
       setPdfLoading(false);
     }
@@ -1272,8 +1276,8 @@ export function DepartmentDetailsModal({
 
         // Ajouter l'image du logo (position: x=14, y=10, taille: 40x30)
         doc.addImage(logoDataUrl, "WEBP", 14, 10, 30, 30);
-      } catch (error) {
-        console.warn("Impossible de charger le logo:", error);
+      } catch (_error) {
+        // console.warn("Impossible de charger le logo:", _error);
       }
 
       // En-tête du document (décalé à droite pour laisser place au logo)
@@ -1567,8 +1571,8 @@ export function DepartmentDetailsModal({
           new Date().toISOString().split("T")[0]
         }.pdf`
       );
-    } catch (error) {
-      console.error("Erreur lors de l'export PDF:", error);
+    } catch (_error) {
+      // console.error("Erreur lors de l'export PDF:", error);
     } finally {
       setPdfLoading(false);
     }
@@ -1622,23 +1626,23 @@ export function DepartmentDetailsModal({
                   {(() => {
                     const canPublish = canPublishDepartment();
                     if (process.env.NODE_ENV === "development") {
-                      console.warn(
-                        "🔍 [DepartmentDetailsModal] Conditions bouton Publier:",
-                        {
-                          isUser,
-                          canPublish,
-                          hasOnPublish: !!onPublish,
-                          departmentData: departmentData
-                            ? {
-                                code: departmentData.codeDepartement,
-                                status: departmentData.publicationStatus,
-                                importedCels: departmentData.importedCels,
-                                pendingCels: departmentData.pendingCels,
-                                totalCels: departmentData.totalCels,
-                              }
-                            : null,
-                        }
-                      );
+                      // console.warn(
+                      //   "🔍 [DepartmentDetailsModal] Conditions bouton Publier:",
+                      //   {
+                      //     isUser,
+                      //     canPublish,
+                      //     hasOnPublish: !!onPublish,
+                      //     departmentData: departmentData
+                      //       ? {
+                      //           code: departmentData.codeDepartement,
+                      //           status: departmentData.publicationStatus,
+                      //           importedCels: departmentData.importedCels,
+                      //           pendingCels: departmentData.pendingCels,
+                      //           totalCels: departmentData.totalCels,
+                      //         }
+                      //       : null,
+                      //   }
+                      // );
                     }
                     return !isUser && canPublish && onPublish;
                   })() && (

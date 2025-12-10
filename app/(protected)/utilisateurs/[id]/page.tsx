@@ -1,32 +1,38 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { MainLayout } from '@/components/layout/main-layout';
-import { EditUserModal } from '@/components/modals/edit-user-modal';
-import { DeleteUserModal } from '@/components/modals/delete-user-modal';
-import { ManageUserDepartmentsModal } from '@/components/modals/manage-user-departments-modal';
-import { ManageUserCelsModal } from '@/components/modals/manage-user-cels-modal';
-import { 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
-  UserCheck, 
-  Mail, 
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { MainLayout } from "@/components/layout/main-layout";
+import { EditUserModal } from "@/components/modals/edit-user-modal";
+import { DeleteUserModal } from "@/components/modals/delete-user-modal";
+// import { ManageUserDepartmentsModal } from '@/components/modals/manage-user-departments-modal';
+import { ManageUserCelsModal } from "@/components/modals/manage-user-cels-modal";
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  UserCheck,
+  Mail,
   Calendar,
   Shield,
   MapPin,
-  Activity
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
-import { usersApi, type User } from '@/lib/api';
+  Activity,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import { usersApi, type User } from "@/lib/api";
 
 // Interface User est maintenant importée depuis @/lib/api
 
@@ -40,23 +46,27 @@ export default function UserDetailPage() {
   // États des modales
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [departmentsModalOpen, setDepartmentsModalOpen] = useState(false);
+  // const [departmentsModalOpen, setDepartmentsModalOpen] = useState(false);
   const [celsModalOpen, setCelsModalOpen] = useState(false);
 
   const userId = params.id as string;
 
   // Vérifier les permissions
-  const canManageUsers = currentUser?.role?.code === 'SADMIN' || currentUser?.role?.code === 'ADMIN';
+  const canManageUsers =
+    currentUser?.role?.code === "SADMIN" || currentUser?.role?.code === "ADMIN";
 
   const fetchUser = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const response: User = await usersApi.getUser(userId);
       setUser(response);
     } catch (error: unknown) {
-      console.error('Erreur lors du chargement de l\'utilisateur:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement de l\'utilisateur';
+      // console.error('Erreur lors du chargement de l\'utilisateur:', error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erreur lors du chargement de l'utilisateur";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -75,22 +85,22 @@ export default function UserDetailPage() {
 
   const getRoleBadgeVariant = (roleCode: string) => {
     switch (roleCode) {
-      case 'SADMIN':
-        return 'destructive';
-      case 'ADMIN':
-        return 'default';
-      case 'USER':
-        return 'secondary';
+      case "SADMIN":
+        return "destructive";
+      case "ADMIN":
+        return "default";
+      case "USER":
+        return "secondary";
       default:
-        return 'outline';
+        return "outline";
     }
   };
 
   const getRoleDisplayName = (roleCode: string) => {
     const roleNames = {
-      SADMIN: 'Super Administrateur',
-      ADMIN: 'Administrateur',
-      USER: 'Utilisateur',
+      SADMIN: "Super Administrateur",
+      ADMIN: "Administrateur",
+      USER: "Utilisateur",
     };
     return roleNames[roleCode as keyof typeof roleNames] || roleCode;
   };
@@ -100,12 +110,12 @@ export default function UserDetailPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -164,7 +174,9 @@ export default function UserDetailPage() {
       <MainLayout>
         <Card className="w-full max-w-md mx-auto">
           <CardHeader>
-            <CardTitle className="text-center">Utilisateur non trouvé</CardTitle>
+            <CardTitle className="text-center">
+              Utilisateur non trouvé
+            </CardTitle>
             <CardDescription className="text-center">
               L&apos;utilisateur demandé n&apos;existe pas
             </CardDescription>
@@ -204,15 +216,18 @@ export default function UserDetailPage() {
               <Edit className="mr-2 h-4 w-4" />
               Modifier
             </Button>
-                <Button onClick={() => setDepartmentsModalOpen(true)}>
+            {/* <Button onClick={() => setDepartmentsModalOpen(true)}>
                   <UserCheck className="mr-2 h-4 w-4" />
                   Départements
-                </Button>
-                <Button onClick={() => setCelsModalOpen(true)}>
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  CELs
-                </Button>
-            <Button variant="destructive" onClick={() => setDeleteModalOpen(true)}>
+                </Button> */}
+            <Button onClick={() => setCelsModalOpen(true)}>
+              <UserCheck className="mr-2 h-4 w-4" />
+              CELs
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteModalOpen(true)}
+            >
               <Trash2 className="mr-2 h-4 w-4" />
               Supprimer
             </Button>
@@ -233,7 +248,10 @@ export default function UserDetailPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src="" alt={`${user.firstName} ${user.lastName}`} />
+                    <AvatarImage
+                      src=""
+                      alt={`${user.firstName} ${user.lastName}`}
+                    />
                     <AvatarFallback className="text-lg">
                       {getUserInitials(user.firstName, user.lastName)}
                     </AvatarFallback>
@@ -245,18 +263,20 @@ export default function UserDetailPage() {
                     <p className="text-muted-foreground">ID: {user.id}</p>
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Email</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.email}
+                    </p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-muted-foreground" />
@@ -266,17 +286,17 @@ export default function UserDetailPage() {
                       {getRoleDisplayName(user.role.code)}
                     </Badge>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Activity className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Statut</span>
                     </div>
-                    <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                      {user.isActive ? 'Actif' : 'Inactif'}
+                    <Badge variant={user.isActive ? "default" : "secondary"}>
+                      {user.isActive ? "Actif" : "Inactif"}
                     </Badge>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -290,8 +310,8 @@ export default function UserDetailPage() {
               </CardContent>
             </Card>
 
-                {/* Départements assignés */}
-                <Card>
+            {/* Départements assignés */}
+            {/* <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5" />
@@ -323,42 +343,52 @@ export default function UserDetailPage() {
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </Card> */}
 
-                {/* CELs assignées */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      CELs assignées
-                    </CardTitle>
-                    <CardDescription>
-                      {user.cellules ? user.cellules.length : 0} CEL{(user.cellules ? user.cellules.length : 0) > 1 ? 's' : ''} assignée{(user.cellules ? user.cellules.length : 0) > 1 ? 's' : ''}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {user.cellules && user.cellules.length > 0 ? (
-                      <div className="space-y-3">
-                        {user.cellules.map((cel) => (
-                          <div key={cel.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{cel.libelleCellule}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {cel.codeCellule}
-                              </p>
-                            </div>
-                            <Badge variant="outline">{cel.codeCellule}</Badge>
-                          </div>
-                        ))}
+            {/* CELs assignées */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  CELs assignées
+                </CardTitle>
+                <CardDescription>
+                  {user.cellules ? user.cellules.length : 0} CEL
+                  {(user.cellules ? user.cellules.length : 0) > 1
+                    ? "s"
+                    : ""}{" "}
+                  assignée
+                  {(user.cellules ? user.cellules.length : 0) > 1 ? "s" : ""}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user.cellules && user.cellules.length > 0 ? (
+                  <div className="space-y-3">
+                    {user.cellules.map((cel, index) => (
+                      <div
+                        key={cel.COD_CEL || index}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {cel.LIB_CEL || cel.COD_CEL}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {cel.COD_CEL}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{cel.COD_CEL}</Badge>
                       </div>
-                    ) : (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>Aucune CEL assignée</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Aucune CEL assignée</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Informations secondaires */}
@@ -369,19 +399,30 @@ export default function UserDetailPage() {
                 <CardTitle>Actions rapides</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button onClick={() => setEditModalOpen(true)} className="w-full justify-start">
+                <Button
+                  onClick={() => setEditModalOpen(true)}
+                  className="w-full justify-start"
+                >
                   <Edit className="mr-2 h-4 w-4" />
                   Modifier le profil
                 </Button>
-                    <Button onClick={() => setDepartmentsModalOpen(true)} variant="outline" className="w-full justify-start">
+                {/* <Button onClick={() => setDepartmentsModalOpen(true)} variant="outline" className="w-full justify-start">
                       <UserCheck className="mr-2 h-4 w-4" />
                       Gérer les départements
-                    </Button>
-                    <Button onClick={() => setCelsModalOpen(true)} variant="outline" className="w-full justify-start">
-                      <UserCheck className="mr-2 h-4 w-4" />
-                      Gérer les CELs
-                    </Button>
-                <Button variant="destructive" className="w-full justify-start" onClick={() => setDeleteModalOpen(true)}>
+                    </Button> */}
+                <Button
+                  onClick={() => setCelsModalOpen(true)}
+                  variant="outline"
+                  className="w-full justify-start"
+                >
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  Gérer les CELs
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full justify-start"
+                  onClick={() => setDeleteModalOpen(true)}
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Supprimer l&apos;utilisateur
                 </Button>
@@ -429,22 +470,22 @@ export default function UserDetailPage() {
           open={deleteModalOpen}
           onOpenChange={setDeleteModalOpen}
           user={user}
-          onSuccess={() => router.push('/users')}
+          onSuccess={() => router.push("/users")}
         />
 
-            <ManageUserDepartmentsModal
+        {/* <ManageUserDepartmentsModal
               open={departmentsModalOpen}
               onOpenChange={setDepartmentsModalOpen}
               user={user}
               onSuccess={handleModalSuccess}
-            />
+            /> */}
 
-            <ManageUserCelsModal
-              open={celsModalOpen}
-              onOpenChange={setCelsModalOpen}
-              user={user}
-              onSuccess={handleModalSuccess}
-            />
+        <ManageUserCelsModal
+          open={celsModalOpen}
+          onOpenChange={setCelsModalOpen}
+          user={user}
+          onSuccess={handleModalSuccess}
+        />
       </div>
     </MainLayout>
   );

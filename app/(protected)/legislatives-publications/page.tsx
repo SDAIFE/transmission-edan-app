@@ -19,10 +19,10 @@ import { LegislativesPublicationsPageContent } from "@/components/legislatives-p
 
 const LegislativesPublicationsPage = memo(
   function LegislativesPublicationsPage() {
-    if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
-      console.log("🔄 [LegislativesPublicationsPage] RENDER");
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   // eslint-disable-next-line no-console
+    //   console.log("🔄 [LegislativesPublicationsPage] RENDER");
+    // }
 
     const { user: currentUser, isAuthenticated } = useAuth();
     const [loading, setLoading] = useState(false);

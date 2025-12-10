@@ -26,9 +26,9 @@ export const authService = {
   // Orchestration de l'appel API et de la gestion des cookies
   async login(credentials: LoginDto): Promise<AuthResponseDto> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🔐 [AuthService] Tentative de connexion...');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🔐 [AuthService] Tentative de connexion...');
+      // }
       // 🔄 ÉTAPE 6 : APPEL DE L'API D'AUTHENTIFICATION
       // Délégation vers authApi.login() pour l'appel HTTP au backend
       // Transmission des identifiants au serveur d'authentification
@@ -84,18 +84,21 @@ export const authService = {
         userName
       );
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('✅ [AuthService] Connexion réussie pour:', response.user.email);
-        console.warn('📋 [AuthService] Rôle:', roleCode, '| Statut:', userStatus);
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('✅ [AuthService] Connexion réussie pour:', response.user.email);
+      //   console.warn('📋 [AuthService] Rôle:', roleCode, '| Statut:', userStatus);
+      // }
 
       return response;
     } catch (error: unknown) {
-      console.error('❌ [AuthService] Erreur de connexion:', error);
+      console.error('❌ [AuthService25] Erreur de connexion:', error);
 
+      // ✅ AMÉLIORATION : Extraire correctement le message et le status de l'erreur
+      // L'erreur peut venir de authApi.login() qui préserve maintenant status et code
       const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
       const errorCode = (error as { code?: string })?.code;
-      const errorStatus = (error as { response?: { status?: number } })?.response?.status;
+      // L'erreur enrichie de authApi.login() a maintenant un status direct
+      const errorStatus = (error as { status?: number })?.status;
 
       const authError: AuthError = {
         message: errorMessage,
@@ -112,15 +115,15 @@ export const authService = {
    */
   async register(userData: RegisterDto): Promise<UserResponseDto> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('📝 [AuthService] Tentative d\'inscription...');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('📝 [AuthService] Tentative d\'inscription...');
+      // }
 
       const response = await authApi.register(userData);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('✅ [AuthService] Inscription réussie pour:', response.email);
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('✅ [AuthService] Inscription réussie pour:', response.email);
+      // }
       return response;
     } catch (error: unknown) {
       console.error('❌ [AuthService] Erreur d\'inscription:', error);
@@ -144,16 +147,16 @@ export const authService = {
    */
   async logout(): Promise<void> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🚪 [AuthService] Déconnexion...');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🚪 [AuthService] Déconnexion...');
+      // }
       // Appeler l'API de déconnexion
       await authApi.logout();
       // ✅ SÉCURITÉ : Supprimer uniquement les cookies (plus de localStorage)
       await deleteAuthCookie();
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('✅ [AuthService] Déconnexion réussie');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('✅ [AuthService] Déconnexion réussie');
+      // }
     } catch (error: unknown) {
       console.error('❌ [AuthService] Erreur de déconnexion:', error);
 
@@ -207,19 +210,19 @@ export const authService = {
         throw new Error('Aucun refresh token disponible');
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🔄 [AuthService] Tentative de refresh du token...');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🔄 [AuthService] Tentative de refresh du token...');
+      // }
 
       const response = await authApi.refresh(refreshToken);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🔄 [AuthService] Response refresh token:', {
-          hasAccessToken: !!response.accessToken,
-          hasUser: !!response.user,
-          userRole: response.user?.role,
-        });
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🔄 [AuthService] Response refresh token:', {
+      //     hasAccessToken: !!response.accessToken,
+      //     hasUser: !!response.user,
+      //     userRole: response.user?.role,
+      //   });
+      // }
 
       if (response.accessToken && response.user) {
         // ✅ SÉCURITÉ : Mettre à jour les cookies avec les nouveaux tokens
@@ -247,9 +250,9 @@ export const authService = {
           userName
         );
 
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('✅ [AuthService] Token rafraîchi avec succès (cookies httpOnly mis à jour)');
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('✅ [AuthService] Token rafraîchi avec succès (cookies httpOnly mis à jour)');
+        // }
 
         // Marquer la reconnexion pour les notifications
         if (typeof window !== 'undefined') {
@@ -273,9 +276,9 @@ export const authService = {
       );
 
       if (isNetworkError) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ [AuthService] Erreur réseau lors du refresh, réessai possible');
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('⚠️ [AuthService] Erreur réseau lors du refresh, réessai possible');
+        // }
         const authError: AuthError = {
           message: 'Erreur de connexion, veuillez réessayer',
           code: 'NETWORK_ERROR',
@@ -311,41 +314,41 @@ export const authService = {
       });
 
       if (!tokenResponse.ok) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('🔐 [AuthService] Pas de token dans les cookies');
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('🔐 [AuthService] Pas de token dans les cookies');
+        // }
         return false;
       }
 
       const { hasToken } = await tokenResponse.json();
       if (!hasToken) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('🔐 [AuthService] Aucun token présent');
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('🔐 [AuthService] Aucun token présent');
+        // }
         return false;
       }
 
       // ✅ CORRECTION : Vérifier le token avec gestion d'erreur robuste
       try {
         const isValid = await authApi.verify();
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('🔐 [AuthService] Token valide:', isValid);
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('🔐 [AuthService] Token valide:', isValid);
+        // }
         return isValid;
       } catch (verifyError: unknown) {
         const error = verifyError as { response?: { status?: number }; status?: number };
         // ✅ CORRECTION : Si erreur 401, le token est expiré mais ne pas lever d'exception
         if (error?.response?.status === 401 || error?.status === 401) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('🔐 [AuthService] Token expiré (401), retour false');
-          }
+          // if (process.env.NODE_ENV === 'development') {
+          //   console.warn('🔐 [AuthService] Token expiré (401), retour false');
+          // }
           return false;
         }
         // Autres erreurs (réseau, etc.)
-        if (process.env.NODE_ENV === 'development') {
-          const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-          console.warn('⚠️ [AuthService] Erreur lors de la vérification:', errorMessage);
-        }
+          // if (process.env.NODE_ENV === 'development') {
+          //   const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+          //   console.warn('⚠️ [AuthService] Erreur lors de la vérification:', errorMessage);
+          // }
         return false;
       }
     } catch (error) {
@@ -414,9 +417,9 @@ export function setupAuthInterceptor() {
   // Cette fonction est maintenant simplifiée car l'intercepteur principal
   // est géré dans lib/api/interceptor.ts pour éviter les doublons
 
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('✅ [AuthService] Intercepteur d\'authentification initialisé');
-  }
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.warn('✅ [AuthService] Intercepteur d\'authentification initialisé');
+  // }
 
   // L'intercepteur principal est configuré dans lib/api/interceptor.ts
   // Cette fonction reste pour la compatibilité mais ne fait plus de configuration

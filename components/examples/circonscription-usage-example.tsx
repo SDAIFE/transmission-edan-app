@@ -1,19 +1,25 @@
-'use client';
+"use client";
 
 /**
  * Exemple d'utilisation des listes simples de circonscriptions
- * 
+ *
  * Ce fichier montre différentes façons d'utiliser :
  * 1. Le hook useSimpleLists()
  * 2. Le composant CirconscriptionSelector
  * 3. L'API listsApi directement
  */
 
-import { useState } from 'react';
-import { useSimpleLists } from '@/hooks/useSimpleLists';
-import { CirconscriptionSelector } from '@/components/ui/circonscription-selector';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from "react";
+import { useSimpleLists } from "@/hooks/useSimpleLists";
+import { CirconscriptionSelector } from "@/components/ui/circonscription-selector";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 /**
  * Exemple 1 : Utilisation du hook useSimpleLists()
@@ -43,17 +49,22 @@ export function ExampleWithHook() {
       <CardHeader>
         <CardTitle>Exemple avec useSimpleLists()</CardTitle>
         <CardDescription>
-          Utilisation du hook personnalisé pour charger les circonscriptions et CELs
+          Utilisation du hook personnalisé pour charger les circonscriptions et
+          CELs
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Sélectionner une circonscription</label>
+          <label className="block text-sm font-medium mb-2">
+            Sélectionner une circonscription
+          </label>
           <select
             className="w-full p-2 border rounded"
-            value={selectedCirconscription?.codCe || ''}
+            value={selectedCirconscription?.codCe || ""}
             onChange={(e) => {
-              const circ = circonscriptions.find(c => c.codCe === e.target.value);
+              const circ = circonscriptions.find(
+                (c) => c.codCe === e.target.value
+              );
               setSelectedCirconscription(circ || null);
             }}
           >
@@ -69,7 +80,8 @@ export function ExampleWithHook() {
         {selectedCirconscription && (
           <div className="p-3 bg-green-50 rounded">
             <p className="text-sm">
-              <strong>Circonscription sélectionnée:</strong> {selectedCirconscription.libCe}
+              <strong>Circonscription sélectionnée:</strong>{" "}
+              {selectedCirconscription.libCe}
             </p>
           </div>
         )}
@@ -97,7 +109,8 @@ export function ExampleWithComponent() {
       <CardHeader>
         <CardTitle>Exemple avec CirconscriptionSelector</CardTitle>
         <CardDescription>
-          Utilisation du composant réutilisable pour la sélection de circonscription
+          Utilisation du composant réutilisable pour la sélection de
+          circonscription
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -115,10 +128,12 @@ export function ExampleWithComponent() {
  * Exemple 3 : Sélection multiple de circonscriptions
  */
 export function ExampleMultipleSelection() {
-  const [selectedCirconscriptions, setSelectedCirconscriptions] = useState<{
-    codCe: string;
-    libCe: string;
-  }[]>([]);
+  const [selectedCirconscriptions, setSelectedCirconscriptions] = useState<
+    {
+      codCe: string;
+      libCe: string;
+    }[]
+  >([]);
 
   return (
     <Card>
@@ -131,6 +146,8 @@ export function ExampleMultipleSelection() {
       <CardContent className="space-y-4">
         <CirconscriptionSelector
           allowMultiple={true}
+          onCirconscriptionSelect={() => {}} // Non utilisé en mode multiple mais requis par l'interface
+          selectedCirconscription={null} // Non utilisé en mode multiple mais requis par l'interface
           onMultipleSelect={setSelectedCirconscriptions}
           selectedMultiple={selectedCirconscriptions}
           placeholder="Choisir une ou plusieurs circonscriptions..."
@@ -139,7 +156,8 @@ export function ExampleMultipleSelection() {
         {selectedCirconscriptions.length > 0 && (
           <div className="p-3 bg-blue-50 rounded">
             <p className="text-sm font-medium mb-2">
-              Circonscriptions sélectionnées ({selectedCirconscriptions.length}):
+              Circonscriptions sélectionnées ({selectedCirconscriptions.length}
+              ):
             </p>
             <ul className="list-disc list-inside space-y-1">
               {selectedCirconscriptions.map((circ) => (
@@ -161,8 +179,8 @@ export function ExampleMultipleSelection() {
 export function ExampleCompleteForm() {
   const { circonscriptions, cels, loading, error } = useSimpleLists();
   const [formData, setFormData] = useState({
-    circonscription: '',
-    cel: '',
+    circonscription: "",
+    cel: "",
   });
 
   if (loading) return <div>Chargement...</div>;
@@ -178,11 +196,15 @@ export function ExampleCompleteForm() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Circonscription *</label>
+          <label className="block text-sm font-medium mb-2">
+            Circonscription *
+          </label>
           <select
             className="w-full p-2 border rounded"
             value={formData.circonscription}
-            onChange={(e) => setFormData({ ...formData, circonscription: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, circonscription: e.target.value })
+            }
           >
             <option value="">Sélectionner une circonscription</option>
             {circonscriptions.map((circ) => (
@@ -194,7 +216,9 @@ export function ExampleCompleteForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Cellule Électorale Locale (CEL)</label>
+          <label className="block text-sm font-medium mb-2">
+            Cellule Électorale Locale (CEL)
+          </label>
           <select
             className="w-full p-2 border rounded"
             value={formData.cel}
@@ -210,15 +234,18 @@ export function ExampleCompleteForm() {
           </select>
           {cels.length === 0 && (
             <p className="text-sm text-orange-600 mt-1">
-              Aucune CEL disponible. Vérifiez vos assignations de circonscriptions.
+              Aucune CEL disponible. Vérifiez vos assignations de
+              circonscriptions.
             </p>
           )}
         </div>
 
-        <Button 
+        <Button
           onClick={() => {
-            console.log('Données du formulaire:', formData);
-            alert(`Circonscription: ${formData.circonscription}\nCEL: ${formData.cel}`);
+            // console.log('Données du formulaire:', formData);
+            alert(
+              `Circonscription: ${formData.circonscription}\nCEL: ${formData.cel}`
+            );
           }}
           disabled={!formData.circonscription}
         >
@@ -228,4 +255,3 @@ export function ExampleCompleteForm() {
     </Card>
   );
 }
-

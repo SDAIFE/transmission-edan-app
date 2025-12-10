@@ -1,11 +1,64 @@
-import { apiClient, handleApiError, buildQueryParams } from './client';
-import type { 
-  CelListResponseDto, 
-  CelResponseDto, 
-  CelStatsDto,
-  DashboardCelListResponseDto,
-  DashboardCelFilterDto 
-} from '@/types/cels';
+import { apiClient, handleApiError, buildQueryParams } from "./client";
+
+// Types locaux pour les CELs (le fichier @/types/cels n'existe pas)
+interface CelResponseDto {
+  codeCellule: string;
+  libelleCellule: string;
+  codeCirconscription?: string;
+  libelleCirconscription?: string;
+  codeDepartement?: string;
+  libelleDepartement?: string;
+  codeRegion?: string;
+  libelleRegion?: string;
+  typeCellule?: string;
+  utilisateurAssign?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  [key: string]: unknown;
+}
+
+interface CelListResponseDto {
+  cels: CelResponseDto[];
+  total: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+interface CelStatsDto {
+  totalCels: number;
+  celsAssignees: number;
+  celsNonAssignees: number;
+  celsParType?: Record<string, number>;
+  celsParRegion?: Record<string, number>;
+  celsParDepartement?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+interface DashboardCelFilterDto {
+  page?: number;
+  limit?: number;
+  codeRegion?: string;
+  codeDepartement?: string;
+  codeCirconscription?: string;
+  typeCellule?: string;
+  assigned?: boolean;
+  search?: string;
+  [key: string]: unknown;
+}
+
+interface DashboardCelListResponseDto {
+  cels: CelResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats?: CelStatsDto;
+  [key: string]: unknown;
+}
 
 // Service API pour les CELs
 export const celsApi = {
@@ -15,7 +68,7 @@ export const celsApi = {
       const queryString = filters ? `?${buildQueryParams(filters as Record<string, unknown>)}` : '';
       const response = await apiClient.get(`/cels${queryString}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -25,7 +78,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get(`/cels/${codeCellule}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -35,7 +88,7 @@ export const celsApi = {
     try {
       const response = await apiClient.patch(`/cels/${codeCellule}`, updates);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -45,7 +98,7 @@ export const celsApi = {
     try {
       const response = await apiClient.patch(`/cels/${codeCellule}/assign-user`, { userId });
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -55,7 +108,7 @@ export const celsApi = {
     try {
       const response = await apiClient.patch(`/cels/${codeCellule}/unassign-user`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -65,7 +118,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get('/cels/stats/overview');
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -75,7 +128,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get(`/cels/departement/${codeDepartement}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -85,7 +138,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get(`/cels/region/${codeRegion}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -95,7 +148,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get('/cels/unassigned/list');
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -105,7 +158,7 @@ export const celsApi = {
     try {
       const response = await apiClient.get(`/cels/type/${typeCellule}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -116,7 +169,7 @@ export const celsApi = {
       const queryString = filters ? `?${buildQueryParams(filters as Record<string, unknown>)}` : '';
       const response = await apiClient.get(`/dashboard/cels${queryString}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },

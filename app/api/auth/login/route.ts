@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     const { success, limit, remaining, reset } = await loginRateLimit.limit(identifier);
     
     if (!success) {
-      console.warn(`🚫 [Security] Rate limit dépassé pour IP: ${identifier}`);
+      // console.warn(`🚫 [Security] Rate limit dépassé pour IP: ${identifier}`);
       return NextResponse.json(
         { 
           error: 'Trop de tentatives de connexion. Veuillez réessayer plus tard.',

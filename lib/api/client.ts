@@ -27,7 +27,7 @@ export const handleApiError = (error: unknown): string => {
     code?: string 
   };
   
-  // Message personnalisé du backend (prioritaire)
+  // Message personnalisé du backend (prioritaire) - doit être vérifié en premier
   if (errorObj.response?.data?.message) {
     return errorObj.response.data.message;
   }
@@ -38,9 +38,9 @@ export const handleApiError = (error: unknown): string => {
     return `Trop de tentatives. Veuillez réessayer dans ${retryAfter} secondes.`;
   }
   
-  // ✅ Gestion erreur 401 (Non authentifié)
+  // ✅ Gestion erreur 401 (Non authentifié) - seulement si pas de message du backend
   if (errorObj.response?.status === 401) {
-    return 'Session expirée, veuillez vous reconnecter';
+    return 'Email ou mot de passe incorrect';
   }
   
   // ✅ Gestion erreur 403 (Non autorisé)

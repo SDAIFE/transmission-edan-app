@@ -11,7 +11,7 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
-import { authService, type AuthError } from "@/lib/services/auth.service";
+import { authService } from "@/lib/services/auth.service";
 // ✅ SÉCURITÉ : Plus besoin de getAuthToken, removeAuthToken (localStorage supprimé)
 import { getRedirectPath } from "@/lib/utils/auth";
 import { deleteAuthCookie } from "@/actions/auth.action";
@@ -72,9 +72,9 @@ type AuthStateType = (typeof AUTH_STATES)[keyof typeof AUTH_STATES];
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   // Log pour détecter les re-renders du contexte
-  if (process.env.NODE_ENV === "development") {
-    console.log("🔄 [AuthProvider] RENDER");
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   console.log("🔄 [AuthProvider] RENDER");
+  // }
 
   // États principaux
   const [authState, setAuthState] = useState<AuthStateType>(
@@ -87,7 +87,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Références pour éviter les re-renders inutiles
   const initializationRef = useRef<boolean>(false);
-  const authCheckRef = useRef<boolean>(false);
   const router = useRouter();
 
   // États dérivés
@@ -104,19 +103,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (initializationRef.current) return;
     initializationRef.current = true;
 
-    if (process.env.NODE_ENV === "development") {
-      console.log(
-        "🔐 [AuthContext] Initialisation du contexte d'authentification"
-      );
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.log(
+    //     "🔐 [AuthContext] Initialisation du contexte d'authentification"
+    //   );
+    // }
 
     // ✅ CORRECTION : Timeout de sécurité pour éviter le blocage
     const initTimeout = setTimeout(() => {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(
-          "⚠️ [AuthContext] Timeout d'initialisation, passage à UNAUTHENTICATED"
-        );
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.warn(
+      //     "⚠️ [AuthContext] Timeout d'initialisation, passage à UNAUTHENTICATED"
+      //   );
+      // }
       setAuthState(AUTH_STATES.UNAUTHENTICATED);
       setUser(null);
     }, 10000); // 10 secondes maximum
@@ -131,9 +130,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (!tokenResponse.ok || !tokenResponse) {
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Aucun token trouvé");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Aucun token trouvé");
+        // }
         clearTimeout(initTimeout);
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
         return;
@@ -142,9 +141,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { hasToken, hasRefreshToken } = await tokenResponse.json();
 
       if (!hasToken) {
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Aucun token trouvé");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Aucun token trouvé");
+        // }
         clearTimeout(initTimeout);
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
         return;
@@ -157,24 +156,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Token valide, récupérer les données utilisateur
         try {
           const userData = await authService.getCurrentUser();
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "🔐 [AuthContext] Utilisateur authentifié:",
-              userData.email
-            );
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log(
+          //     "🔐 [AuthContext] Utilisateur authentifié:",
+          //     userData.email
+          //   );
+          // }
 
           clearTimeout(initTimeout);
           setUser(userData);
           setAuthState(AUTH_STATES.AUTHENTICATED);
           return;
-        } catch (getUserError) {
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "🔐 [AuthContext] Erreur lors de la récupération du profil:",
-              getUserError
-            );
-          }
+        } catch {
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log(
+          //     "🔐 [AuthContext] Erreur lors de la récupération du profil:",
+          //     getUserError
+          //   );
+          // }
           // Si on ne peut pas récupérer le profil, nettoyer et déconnecter
           clearTimeout(initTimeout);
           await deleteAuthCookie();
@@ -188,19 +187,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // ✅ CORRECTION : Token invalide, tenter de le rafraîchir SEULEMENT s'il y a un refresh token
       if (hasRefreshToken) {
         try {
-          if (process.env.NODE_ENV === "development") {
-            console.log("🔐 [AuthContext] Tentative de refresh du token...");
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log("🔐 [AuthContext] Tentative de refresh du token...");
+          // }
           const newToken = await authService.refreshToken();
           if (newToken) {
             // Récupérer les nouvelles données utilisateur
             const userData = await authService.getCurrentUser();
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                "🔐 [AuthContext] Token rafraîchi, utilisateur authentifié:",
-                userData.email
-              );
-            }
+            // if (process.env.NODE_ENV === "development") {
+            //   console.log(
+            //     "🔐 [AuthContext] Token rafraîchi, utilisateur authentifié:",
+            //     userData.email
+            //   );
+            // }
 
             clearTimeout(initTimeout);
             setUser(userData);
@@ -215,21 +214,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
             return;
           }
-        } catch (refreshError: any) {
-          if (process.env.NODE_ENV === "development") {
-            console.log("🔐 [AuthContext] Échec du refresh:", refreshError);
-          }
+        } catch (refreshError: unknown) {
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log("🔐 [AuthContext] Échec du refresh:", refreshError);
+          // }
 
           // ✅ CORRECTION : Si le refresh échoue avec une erreur 401, nettoyer immédiatement
-          if (
-            refreshError?.status === 401 ||
-            refreshError?.code === "REFRESH_TOKEN_ERROR"
-          ) {
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                "🔐 [AuthContext] Token expiré détecté, nettoyage..."
-              );
-            }
+          const error = refreshError as { status?: number; code?: string };
+          if (error?.status === 401 || error?.code === "REFRESH_TOKEN_ERROR") {
+            // if (process.env.NODE_ENV === "development") {
+            //   console.log(
+            //     "🔐 [AuthContext] Token expiré détecté, nettoyage..."
+            //   );
+            // }
             clearTimeout(initTimeout);
             await deleteAuthCookie();
             setUser(null);
@@ -242,11 +239,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       // ✅ CORRECTION : Aucun refresh token ou échec du refresh, nettoyer et passer à UNAUTHENTICATED
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "🔐 [AuthContext] Aucun refresh token ou échec du refresh, nettoyage..."
-        );
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log(
+      //     "🔐 [AuthContext] Aucun refresh token ou échec du refresh, nettoyage..."
+      //   );
+      // }
       clearTimeout(initTimeout);
       await deleteAuthCookie();
       setUser(null);
@@ -281,9 +278,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSessionExpired(false);
         setInactivityWarning(false);
 
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Tentative de connexion...");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Tentative de connexion...");
+        // }
         // 🔄 ÉTAPE 4 : APPEL DU SERVICE D'AUTHENTIFICATION
         // Délégation vers authService.login() pour la logique métier
         // Le service gère l'appel API et la création des cookies
@@ -304,33 +301,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
               ? response.user.role
               : response.user.role?.code || "USER";
           const redirectPath = getRedirectPath(roleCode);
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "🔐 [AuthContext] Connexion réussie, redirection vers:",
-              redirectPath
-            );
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log(
+          //     "🔐 [AuthContext] Connexion réussie, redirection vers:",
+          //     redirectPath
+          //   );
+          // }
 
           // 🔄 ÉTAPE 12 : EXÉCUTION DE LA REDIRECTION
           // Redirection avec délai pour laisser l'état se stabiliser
           // Utilisation de router.push() pour naviguer vers la page de destination
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "🔐 [AuthContext] Exécution de la redirection vers:",
-              redirectPath
-            );
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log(
+          //     "🔐 [AuthContext] Exécution de la redirection vers:",
+          //     redirectPath
+          //   );
+          // }
 
           // Délai court pour éviter les conflits de redirection
           setTimeout(() => {
             router.push(redirectPath);
           }, 100);
         }
-      } catch (error: any) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("❌ [AuthContext] Erreur de connexion:", error);
-        }
-        setError(error.message || "Erreur de connexion");
+      } catch (error: unknown) {
+        // ✅ AMÉLIORATION : Utiliser le message de l'erreur qui contient déjà le message du backend
+        // L'erreur vient de authService.login() qui a préservé le message du backend
+        const errorMessage =
+          error instanceof Error ? error.message : "Erreur de connexion";
+        setError(errorMessage);
         setAuthState(AUTH_STATES.ERROR);
         throw error;
       }
@@ -347,22 +345,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAuthState(AUTH_STATES.LOADING);
         setError(null);
 
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Tentative d'inscription...");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Tentative d'inscription...");
+        // }
         await authService.register(userData);
 
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Inscription réussie");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Inscription réussie");
+        // }
 
         // Rediriger vers la page de connexion
         router.replace("/auth/login");
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (process.env.NODE_ENV === "development") {
           console.error("❌ [AuthContext] Erreur d'inscription:", error);
         }
-        setError(error.message || "Erreur d'inscription");
+        const errorMessage =
+          error instanceof Error ? error.message : "Erreur d'inscription";
+        setError(errorMessage);
         setAuthState(AUTH_STATES.ERROR);
         throw error;
       }
@@ -377,9 +377,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setAuthState(AUTH_STATES.LOADING);
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔐 [AuthContext] Déconnexion...");
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log("🔐 [AuthContext] Déconnexion...");
+      // }
       await authService.logout();
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
@@ -398,9 +398,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         sessionStorage.removeItem("lastReconnect");
       }
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔐 [AuthContext] Déconnexion terminée");
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log("🔐 [AuthContext] Déconnexion terminée");
+      // }
 
       // Redirection vers la page de connexion
       router.replace("/auth/login");
@@ -431,9 +431,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false;
       }
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔐 [AuthContext] Rafraîchissement du token...");
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log("🔐 [AuthContext] Rafraîchissement du token...");
+      // }
       const newToken = await authService.refreshToken();
 
       if (newToken) {
@@ -450,9 +450,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           sessionStorage.setItem("lastReconnect", Date.now().toString());
         }
 
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔐 [AuthContext] Token rafraîchi avec succès");
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log("🔐 [AuthContext] Token rafraîchi avec succès");
+        // }
         return true;
       }
 
@@ -503,9 +503,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const handleSessionExpired = useCallback(
     (event: CustomEvent) => {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔐 [AuthContext] Session expirée:", event.detail?.reason);
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log("🔐 [AuthContext] Session expirée:", event.detail?.reason);
+      // }
 
       // ✅ CORRECTION : Ne pas déclencher l'expiration si l'utilisateur vient juste de se connecter
       // Vérifier si une connexion récente a eu lieu (dans les 5 dernières secondes)
@@ -518,11 +518,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const timeSinceReconnect = Date.now() - parseInt(lastReconnect, 10);
         if (timeSinceReconnect < 5000) {
           // 5 secondes
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "🔐 [AuthContext] Connexion récente détectée, ignorer l'expiration de session"
-            );
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.log(
+          //     "🔐 [AuthContext] Connexion récente détectée, ignorer l'expiration de session"
+          //   );
+          // }
           // Nettoyer le flag de reconnexion
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("lastReconnect");
@@ -534,11 +534,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // ✅ CORRECTION : Vérifier que l'utilisateur est vraiment authentifié avant d'expirer
       // Si on n'est pas authentifié, ne rien faire (évite les boucles)
       if (authState !== AUTH_STATES.AUTHENTICATED) {
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            "🔐 [AuthContext] Utilisateur non authentifié, ignorer l'expiration"
-          );
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log(
+        //     "🔐 [AuthContext] Utilisateur non authentifié, ignorer l'expiration"
+        //   );
+        // }
         return;
       }
 
@@ -580,11 +580,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const handleCustomLogout = () => {
       if (isAuthenticated) {
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            "🔐 [AuthContext] Déconnexion détectée dans un autre onglet"
-          );
-        }
+        // if (process.env.NODE_ENV === "development") {
+        //   console.log(
+        //     "🔐 [AuthContext] Déconnexion détectée dans un autre onglet"
+        //   );
+        // }
         setUser(null);
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
         router.replace("/auth/login");
@@ -592,9 +592,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const handleSessionExpiredEvent = (event: CustomEvent) => {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔐 [AuthContext] Session expirée détectée:", event.detail);
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.log("🔐 [AuthContext] Session expirée détectée:", event.detail);
+      // }
 
       // Déclencher la gestion d'expiration de session
       handleSessionExpired(event);
@@ -624,9 +624,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Valeur du contexte mémorisée pour éviter les re-renders
   const contextValue: AuthContextType = useMemo(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔄 [AuthContext] contextValue recalculé");
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.log("🔄 [AuthContext] contextValue recalculé");
+    // }
     return {
       // État
       user,

@@ -1,9 +1,35 @@
-import { apiClient, handleApiError, buildQueryParams } from './client';
-import type { 
-  DepartementListResponseDto, 
-  DepartementResponseDto, 
-  DepartementStatsDto 
-} from '@/types/departements';
+import { apiClient, handleApiError, buildQueryParams } from "./client";
+
+// Types locaux pour les départements (le fichier @/types/departements n'existe pas)
+interface DepartementResponseDto {
+  codeDepartement: string;
+  libelleDepartement: string;
+  codeRegion?: string;
+  libelleRegion?: string;
+  utilisateurAssign?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  [key: string]: unknown;
+}
+
+interface DepartementListResponseDto {
+  departements: DepartementResponseDto[];
+  total: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+interface DepartementStatsDto {
+  totalDepartements: number;
+  departementsAssignes: number;
+  departementsNonAssignes: number;
+  departementsParRegion?: Record<string, number>;
+  [key: string]: unknown;
+}
 
 // Service API pour les départements
 export const departementsApi = {
@@ -13,7 +39,7 @@ export const departementsApi = {
       const queryString = filters ? `?${buildQueryParams(filters)}` : '';
       const response = await apiClient.get(`/departements${queryString}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -23,7 +49,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.get(`/departements/${codeDepartement}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -33,7 +59,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.patch(`/departements/${codeDepartement}`, updates);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -43,7 +69,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.patch(`/departements/${codeDepartement}/assign-user`, { userId });
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -53,7 +79,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.patch(`/departements/${codeDepartement}/unassign-user`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -63,7 +89,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.get('/departements/stats/overview');
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },
@@ -73,7 +99,7 @@ export const departementsApi = {
     try {
       const response = await apiClient.get(`/departements/region/${codeRegion}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(handleApiError(error));
     }
   },

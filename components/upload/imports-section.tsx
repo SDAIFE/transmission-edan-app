@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
 // Composants
@@ -104,12 +104,18 @@ export function ImportsSection({
     }
   };
 
-  // Utiliser les imports passés en props ou charger localement
+  // ✅ CORRECTION : Utiliser directement propsImports si disponible, sinon utiliser l'état local
+  // ✅ CORRECTION : Utiliser useMemo pour éviter les re-renders inutiles et garantir la réactivité
+  const importsToUse = useMemo(() => {
+    return propsImports && propsImports.length > 0 ? propsImports : imports;
+  }, [propsImports, imports]);
+
+  // ✅ CORRECTION : Synchroniser l'état local avec propsImports quand il change
   useEffect(() => {
     if (propsImports) {
       // Utiliser les imports passés en props
       if (process.env.NODE_ENV === "development") {
-        console.log("📋 [ImportsSection] Utilisation des imports en props:", {
+        console.log("📋 [ImportsSection] Synchronisation avec propsImports:", {
           count: propsImports.length,
           imports: propsImports.map((i) => ({
             id: i.id,
@@ -126,7 +132,8 @@ export function ImportsSection({
       }
       loadImports({ page: 1, limit: 10 });
     }
-  }, [propsImports]); // Seulement dépendre de propsImports pour éviter la boucle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propsImports]); // loadImports retiré intentionnellement pour éviter la boucle infinie
 
   // Synchroniser les filtres avec les props
   useEffect(() => {
@@ -226,13 +233,13 @@ export function ImportsSection({
         filters={filters}
         onFiltersChange={handleFiltersChange}
         availableCels={availableCels}
-        imports={imports}
+        imports={importsToUse} // ✅ CORRECTION : Utiliser importsToUse (propsImports ou imports local)
         loading={propsLoading || importsLoading}
       />
 
       {/* Tableau des imports */}
       <ImportsTable
-        imports={imports}
+        imports={importsToUse} // ✅ CORRECTION : Utiliser importsToUse (propsImports ou imports local)
         loading={propsLoading || importsLoading}
         onRefresh={handleRefresh}
         onViewDetails={handleViewDetails}

@@ -13,9 +13,9 @@ import { PublicationsPageContentV2 as PublicationsPageContent } from '@/componen
 
 const PublicationsPage = memo(function PublicationsPage() {
   // Log pour tester avec le contexte simplifié
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔄 [PublicationsPage] RENDER');
-  }
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log('🔄 [PublicationsPage] RENDER');
+  // }
 
   const { user: currentUser, isAuthenticated } = useAuth();
   

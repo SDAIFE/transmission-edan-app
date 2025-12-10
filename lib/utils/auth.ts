@@ -50,7 +50,7 @@ export async function hasAuthToken(): Promise<boolean> {
  * Utilisez createAuthCookie() depuis @/actions/auth.action à la place
  */
 export function saveAuthToken(_token: string): void {
-  console.warn('⚠️ saveAuthToken est déprécié. Utilisez createAuthCookie() depuis @/actions/auth.action');
+  // console.warn('⚠️ saveAuthToken est déprécié. Utilisez createAuthCookie() depuis @/actions/auth.action');
 }
 
 /**
@@ -59,7 +59,7 @@ export function saveAuthToken(_token: string): void {
  * Utilisez deleteAuthCookie() depuis @/actions/auth.action à la place
  */
 export function removeAuthToken(): void {
-  console.warn('⚠️ removeAuthToken est déprécié. Utilisez deleteAuthCookie() depuis @/actions/auth.action');
+  // console.warn('⚠️ removeAuthToken est déprécié. Utilisez deleteAuthCookie() depuis @/actions/auth.action');
 }
 
 /**

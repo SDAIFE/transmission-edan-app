@@ -20,7 +20,53 @@ export const authApi = {
       const response = await apiClient.post('/auth/login', credentials);
       return response.data;
     } catch (error) {
-      throw new Error(handleApiError(error));
+      // ✅ AMÉLIORATION : Préserver les informations de l'erreur originale
+      const errorObj = error as {
+        response?: {
+          data?: {
+            message?: string;
+            error?: string;
+            statusCode?: number;
+          };
+        };
+        code?: string;
+      };
+
+      // ✅ AMÉLIORATION : Extraire le message du backend (vérifier plusieurs formats possibles)
+      // Format 1: { message: "..." } (format standard du backend)
+      // Format 2: { error: "..." } (format alternatif)
+      let message = errorObj.response?.data?.message;
+      if (!message && errorObj.response?.data?.error) {
+        message = errorObj.response.data.error;
+      }
+      // Si aucun message trouvé, utiliser handleApiError qui gère les cas par défaut
+      if (!message) {
+        message = handleApiError(error);
+      }
+
+      const statusCode = errorObj.response?.data?.statusCode;
+      const code = errorObj.code;
+
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.log('🔍 [AuthAPI] Erreur de connexion:', {
+      //     message,
+      //     statusCode,
+      //     code,
+      //     responseData: errorObj.response?.data
+      //   });
+      // }
+
+      // Créer une erreur enrichie qui préserve toutes les informations
+      const enrichedError = new Error(message) as Error & {
+        statusCode?: number;
+        code?: string;
+        originalError?: unknown;
+      };
+      enrichedError.statusCode = statusCode;
+      enrichedError.code = code;
+      enrichedError.originalError = error;
+
+      throw enrichedError;
     }
   },
 
@@ -45,15 +91,15 @@ export const authApi = {
         }
       });
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🔄 [AuthAPI] Refresh response:', {
-          hasAccessToken: !!response.data.accessToken,
-          hasRefreshToken: !!response.data.refreshToken,
-          hasUser: !!response.data.user,
-          userKeys: response.data.user ? Object.keys(response.data.user) : 'no user',
-          fullResponse: response.data
-        });
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🔄 [AuthAPI] Refresh response:', {
+      //     hasAccessToken: !!response.data.accessToken,
+      //     hasRefreshToken: !!response.data.refreshToken,
+      //     hasUser: !!response.data.user,
+      //     userKeys: response.data.user ? Object.keys(response.data.user) : 'no user',
+      //     fullResponse: response.data
+      //   });
+      // }
 
       return response.data;
     } catch (error) {
@@ -67,7 +113,7 @@ export const authApi = {
       await apiClient.post('/auth/logout');
     } catch {
       // On ignore les erreurs de déconnexion
-      console.warn('Erreur lors de la déconnexion');
+      // console.warn('Erreur lors de la déconnexion');
     }
   },
 
@@ -77,21 +123,21 @@ export const authApi = {
   // Via proxy Next.js : /api/backend/auth/profile/me → ${API_URL}/api/v1/auth/profile/me
   getProfile: async (): Promise<UserResponseDto> => {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('🔐 [AuthAPI] Récupération du profil utilisateur...');
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('🔐 [AuthAPI] Récupération du profil utilisateur...');
+      // }
 
       // ✅ ADAPTATION : Utilisation de la route correcte /auth/profile/me
       const response = await apiClient.get('/auth/profile/me');
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('✅ [AuthAPI] Profil utilisateur récupéré:', {
-          email: response.data.email,
-          role: response.data.role?.code,
-          hasCirconscriptions: !!response.data.circonscriptions?.length,
-          hasCellules: !!response.data.cellules?.length
-        });
-      }
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('✅ [AuthAPI] Profil utilisateur récupéré:', {
+      //     email: response.data.email,
+      //     role: response.data.role?.code,
+      //     hasCirconscriptions: !!response.data.circonscriptions?.length,
+      //     hasCellules: !!response.data.cellules?.length
+      //   });
+      // }
 
       return response.data;
     } catch (error) {
@@ -117,9 +163,9 @@ export const authApi = {
       // ✅ CORRECTION : Retourner false pour les 401 au lieu de lever une exception
       const errorObj = error as { response?: { status?: number } };
       if (errorObj?.response?.status === 401) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('🔐 [AuthAPI] Token invalide (401)');
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('🔐 [AuthAPI] Token invalide (401)');
+        // }
         return false;
       }
       return false;
