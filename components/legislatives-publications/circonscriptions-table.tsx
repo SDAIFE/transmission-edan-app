@@ -117,6 +117,38 @@ export function CirconscriptionsTable({
     return circ.publicationStatus === "1";
   };
 
+  // Couleur de fond selon l'état de la circonscription
+  const getCirconscriptionRowClass = (circ: (typeof circonscriptions)[0]) => {
+    // Priorité à la sélection
+    if (selectedCirconscription === circ.codeCirconscription) {
+      return "bg-muted/50";
+    }
+
+    // Orange atténué avec animation : Prête à publier (toutes CELs importées mais pas encore publiée)
+    const isReadyToPublish =
+      circ.importedCels === circ.totalCels &&
+      circ.totalCels > 0 &&
+      circ.publicationStatus !== "1" &&
+      circ.publicationStatus !== "C";
+
+    if (isReadyToPublish) {
+      return "bg-orange-50/60 hover:bg-orange-50/80 animate-pulse-subtle transition-colors";
+    }
+
+    // Vert atténué : Publiée
+    if (circ.publicationStatus === "1") {
+      return "bg-green-50/50 hover:bg-green-50/70 transition-colors";
+    }
+
+    // Rouge atténué : Annulée
+    if (circ.publicationStatus === "C") {
+      return "bg-red-50/50 hover:bg-red-50/70 transition-colors";
+    }
+
+    // Par défaut, pas de couleur spéciale
+    return "";
+  };
+
   const handleAction = (action: () => void, codeCirconscription: string) => {
     setSelectedCirconscription(codeCirconscription);
     action();
@@ -222,11 +254,7 @@ export function CirconscriptionsTable({
                 return (
                   <TableRow
                     key={circ.codeCirconscription}
-                    className={
-                      selectedCirconscription === circ.codeCirconscription
-                        ? "bg-muted/50"
-                        : ""
-                    }
+                    className={getCirconscriptionRowClass(circ)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
