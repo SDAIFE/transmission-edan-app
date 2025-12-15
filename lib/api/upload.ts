@@ -6,6 +6,7 @@ import type {
   ImportFilters,
   UploadRequestParams,
   CelDataResponse,
+  ReadyToPublishCirconscriptionsResponse,
 } from "@/types/upload";
 import { ImportStatus } from "@/types/upload";
 
@@ -33,13 +34,17 @@ export const uploadApi = {
         params.file.name.endsWith(".xlsx");
 
       if (!isValidExtension) {
-        throw new Error("Type de fichier invalide. Seuls les fichiers .xlsm et .xlsx sont acceptés.");
+        throw new Error(
+          "Type de fichier invalide. Seuls les fichiers .xlsm et .xlsx sont acceptés."
+        );
       }
 
       // 2. ✅ Validation de la taille (10MB max)
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (params.file.size > maxSize) {
-        throw new Error("Le fichier est trop volumineux. Taille maximale : 10MB");
+        throw new Error(
+          "Le fichier est trop volumineux. Taille maximale : 10MB"
+        );
       }
 
       // 3. ✅ Envoyer UNIQUEMENT le fichier Excel au backend
@@ -49,30 +54,37 @@ export const uploadApi = {
       formData.append("codCel", params.codeCellule); // ✅ Utiliser "codCel" selon la doc
 
       // 4. ✅ Utiliser uploadClient (timeout plus long pour fichiers volumineux)
-      const response = await uploadClient.post("legislatives/upload/excel", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            if (process.env.NODE_ENV === "development") {
-              // eslint-disable-next-line no-console
-              console.log(`📊 [UploadAPI] Progression: ${percentCompleted}%`);
+      const response = await uploadClient.post(
+        "legislatives/upload/excel",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              if (process.env.NODE_ENV === "development") {
+                // eslint-disable-next-line no-console
+                console.log(`📊 [UploadAPI] Progression: ${percentCompleted}%`);
+              }
             }
-          }
-        },
-      });
+          },
+        }
+      );
 
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
-        console.log("✅ [UploadAPI] Fichier traité avec succès par le backend:", {
-          importId: response.data.importId,
-          codCel: response.data.codCel,
-          nombreBureauxTraites: response.data.nombreBureauxTraites,
-        });
+        console.log(
+          "✅ [UploadAPI] Fichier traité avec succès par le backend:",
+          {
+            importId: response.data.importId,
+            codCel: response.data.codCel,
+            nombreBureauxTraites: response.data.nombreBureauxTraites,
+          }
+        );
       }
 
       return response.data;
@@ -100,8 +112,10 @@ export const uploadApi = {
           `Erreur serveur (${axiosError.response.status})`;
 
         const uploadError = new Error(errorMessage);
-        (uploadError as { status?: number; details?: unknown }).status = axiosError.response.status;
-        (uploadError as { status?: number; details?: unknown }).details = axiosError.response.data;
+        (uploadError as { status?: number; details?: unknown }).status =
+          axiosError.response.status;
+        (uploadError as { status?: number; details?: unknown }).details =
+          axiosError.response.data;
         throw uploadError;
       }
 
@@ -131,7 +145,8 @@ export const uploadApi = {
       }
       if (filters?.statut) queryParams.append("statut", filters.statut);
       // ✨ Filtre par circonscription
-      if (filters?.codeCirconscription) queryParams.append("codeCirconscription", filters.codeCirconscription);
+      if (filters?.codeCirconscription)
+        queryParams.append("codeCirconscription", filters.codeCirconscription);
 
       const queryString = queryParams.toString();
       const url = queryString
@@ -355,6 +370,53 @@ export const uploadApi = {
       throw error;
     }
   },
+
+  // Récupérer les circonscriptions prêtes à être publiées
+  getReadyToPublishCirconscriptions:
+    async (): Promise<ReadyToPublishCirconscriptionsResponse | null> => {
+      try {
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.log(
+            "📋 [UploadAPI] Récupération des circonscriptions prêtes à publier..."
+          );
+        }
+
+        const response =
+          await apiClient.get<ReadyToPublishCirconscriptionsResponse>(
+            "legislatives/upload/ready-to-publish"
+          );
+
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.log("✅ [UploadAPI] Circonscriptions prêtes récupérées:", {
+            total: response.data.total,
+            circonscriptions: response.data.circonscriptions.length,
+          });
+        }
+
+        return response.data;
+      } catch (error: any) {
+        // Si l'erreur est 403 (Forbidden), l'utilisateur n'a pas les permissions
+        if (error?.response?.status === 403 || error?.status === 403) {
+          console.warn(
+            "⚠️ [UploadAPI] Utilisateur sans permissions pour les circonscriptions prêtes à publier",
+            {
+              status: error?.response?.status,
+              statusText: error?.response?.statusText,
+              code: error?.code,
+            }
+          );
+          return null; // Retourner null au lieu de lancer une erreur
+        }
+
+        console.error(
+          "❌ [UploadAPI] Erreur lors de la récupération des circonscriptions prêtes à publier:",
+          error
+        );
+        throw error;
+      }
+    },
 };
 
 // ✅ Valider le type de fichier (.xlsm ou .xlsx)
@@ -505,7 +567,9 @@ export const getCelData = async (
     } else if (error?.response?.status === 401) {
       throw new Error("Non authentifié. Veuillez vous reconnecter.");
     } else if (error?.response?.status === 403) {
-      throw new Error("Accès interdit. Cette CEL n'est pas accessible pour votre compte.");
+      throw new Error(
+        "Accès interdit. Cette CEL n'est pas accessible pour votre compte."
+      );
     } else if (error?.response?.status === 500) {
       throw new Error("Erreur serveur. Veuillez réessayer plus tard.");
     }

@@ -9,6 +9,7 @@ import { Upload } from "lucide-react";
 import { StatsSection } from "./stats-section";
 import { ImportsSection } from "./imports-section";
 import { UploadModal } from "./upload-modal";
+import { ReadyToPublishCirconscriptionsAlert } from "./ready-to-publish-circonscriptions-alert";
 
 // API et types
 import { uploadApi, listsApi } from "@/lib/api";
@@ -17,6 +18,7 @@ import type {
   ImportData,
   ImportStats,
   ImportFilters as ImportFiltersType,
+  ReadyToPublishCirconscription,
 } from "@/types/upload";
 
 interface UploadPageContentProps {
@@ -42,6 +44,9 @@ export function UploadPageContent({
     page: 1,
     limit: 10,
   });
+  // ✅ NOUVEAU : État pour les circonscriptions prêtes à publier
+  const [readyToPublishCirconscriptions, setReadyToPublishCirconscriptions] =
+    useState<ReadyToPublishCirconscription[]>([]);
 
   // Récupérer l'utilisateur connecté pour filtrer les CELs
   const { user } = useAuth();
@@ -170,11 +175,13 @@ export function UploadPageContent({
         // }
 
         // Charger les données en parallèle, mais gérer les erreurs individuellement
-        const [statsData, importsData, listsData] = await Promise.allSettled([
-          uploadApi.getStats(),
-          uploadApi.getImports(filtersToUse),
-          listsApi.getFormLists(),
-        ]);
+        const [statsData, importsData, listsData, readyToPublishData] =
+          await Promise.allSettled([
+            uploadApi.getStats(),
+            uploadApi.getImports(filtersToUse),
+            listsApi.getFormLists(),
+            uploadApi.getReadyToPublishCirconscriptions(),
+          ]);
 
         // Traiter les statistiques (peuvent être null si pas de permissions)
         if (statsData.status === "fulfilled") {
@@ -237,6 +244,19 @@ export function UploadPageContent({
           );
           toast.error("Erreur lors du chargement des listes");
         }
+
+        // ✅ NOUVEAU : Traiter les circonscriptions prêtes à publier
+        if (
+          readyToPublishData.status === "fulfilled" &&
+          readyToPublishData.value
+        ) {
+          setReadyToPublishCirconscriptions(
+            readyToPublishData.value.circonscriptions
+          );
+        } else {
+          // En cas d'erreur ou de permissions insuffisantes, mettre une liste vide
+          setReadyToPublishCirconscriptions([]);
+        }
       } catch (error: unknown) {
         console.error(
           "❌ [UploadPageContent] Erreur générale lors du chargement:",
@@ -270,8 +290,9 @@ export function UploadPageContent({
       //   );
       // }
 
-      // Charger seulement les stats (les CELs et imports sont déjà chargés)
+      // Charger seulement les stats et circonscriptions prêtes (les CELs et imports sont déjà chargés)
       if (user) {
+        // Charger les stats
         uploadApi
           .getStats()
           .then((statsData) => {
@@ -283,6 +304,21 @@ export function UploadPageContent({
             //   _error
             // );
             setStats(null);
+          });
+
+        // ✅ NOUVEAU : Charger les circonscriptions prêtes à publier
+        uploadApi
+          .getReadyToPublishCirconscriptions()
+          .then((data) => {
+            if (data) {
+              setReadyToPublishCirconscriptions(data.circonscriptions);
+            } else {
+              setReadyToPublishCirconscriptions([]);
+            }
+          })
+          .catch((_error) => {
+            // En cas d'erreur, mettre une liste vide
+            setReadyToPublishCirconscriptions([]);
           });
       }
       return;
@@ -350,6 +386,17 @@ export function UploadPageContent({
     <div className="space-y-6">
       {/* Statistiques */}
       <StatsSection stats={stats} loading={loading} />
+
+      {/* ✅ NOUVEAU : Alerte des circonscriptions prêtes à publier */}
+      <ReadyToPublishCirconscriptionsAlert
+        circonscriptions={readyToPublishCirconscriptions}
+        loading={loading}
+        isUser={user?.role?.code === "USER"}
+        onViewDetails={(codeCirconscription) => {
+          // Optionnel: Filtrer les imports par circonscription quand on clique
+          handleFiltersChange({ ...filters, codeCirconscription, page: 1 });
+        }}
+      />
 
       {/* Bouton pour ouvrir le modal d'upload */}
       <div className="flex justify-center">

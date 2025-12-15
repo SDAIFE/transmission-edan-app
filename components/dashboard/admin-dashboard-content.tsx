@@ -77,7 +77,7 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
   const getTitle = () => {
     switch (userRole) {
       case "ADMIN":
-        return "Gestion des Départements";
+        return "Gestion des Circonscriptions";
       case "SADMIN":
         return "Vue Globale du Système";
       default:

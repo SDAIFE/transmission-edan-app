@@ -2,9 +2,9 @@
 
 // Enum pour les statuts d'import (selon les spécifications backend)
 export enum ImportStatus {
-  N = 'N',  // En attente
-  I = 'I',  // Importé
-  P = 'P'   // Publié
+  N = "N", // En attente
+  I = "I", // Importé
+  P = "P", // Publié
 }
 
 // Interface pour les détails d'un import
@@ -45,18 +45,18 @@ export interface ImportListResponse {
 
 // Interface pour les statistiques d'imports (selon les spécifications backend)
 export interface ImportStats {
-  totalImports: number;        // Total des CELs
-  importsReussis: number;      // CELs avec statut I ou P
-  importsEnErreur: number;      // Pas d'erreurs au niveau CEL
-  importsEnCours: number;       // CELs en attente (statut N)
+  totalImports: number; // Total des CELs
+  importsReussis: number; // CELs avec statut I ou P
+  importsEnErreur: number; // Pas d'erreurs au niveau CEL
+  importsEnCours: number; // CELs en attente (statut N)
   totalLignesImportees: number; // = importsReussis
   totalLignesEnErreur: number;
-  tauxReussite: number;        // Pourcentage d'import
+  tauxReussite: number; // Pourcentage d'import
   importsParCel: Record<string, number>; // Non utilisé
   importsParStatut: {
-    N: number;  // En attente
-    I: number;  // Importé
-    P: number;  // Publié
+    N: number; // En attente
+    I: number; // Importé
+    P: number; // Publié
   };
 }
 
@@ -65,7 +65,7 @@ export interface CelImportItem {
   id: string;
   codeCellule: string;
   libelleCellule: string;
-  statut: 'I' | 'P'; // Importé | Publié
+  statut: "I" | "P"; // Importé | Publié
   dateImport: Date;
   nombreLieuxVote: number;
   utilisateur?: {
@@ -77,13 +77,13 @@ export interface CelImportItem {
 // Interface suggérée par le backend pour le dashboard
 export interface CelStats {
   totalCels: number;
-  celsImportees: number;    // I + P
-  celsEnAttente: number;    // N
-  tauxImport: number;       // Pourcentage
+  celsImportees: number; // I + P
+  celsEnAttente: number; // N
+  tauxImport: number; // Pourcentage
   repartitionParStatut: {
-    N: number;  // Attente
-    I: number;  // Importé
-    P: number;  // Publié
+    N: number; // Attente
+    I: number; // Importé
+    P: number; // Publié
   };
 }
 
@@ -126,7 +126,7 @@ export interface ValidationResult {
 export interface UploadProgress {
   isUploading: boolean;
   progress: number; // 0-100
-  status: 'idle' | 'uploading' | 'success' | 'error';
+  status: "idle" | "uploading" | "success" | "error";
   message?: string;
   error?: string;
 }
@@ -151,7 +151,9 @@ export interface UploadResponse {
 
 // Props pour le sélecteur de CEL
 export interface CelSelectorProps {
-  onCelSelect: (cel: { codeCellule: string; libelleCellule: string } | null) => void;
+  onCelSelect: (
+    cel: { codeCellule: string; libelleCellule: string } | null
+  ) => void;
   selectedCel: { codeCellule: string; libelleCellule: string } | null;
   placeholder?: string;
   disabled?: boolean;
@@ -179,7 +181,7 @@ export interface StatsCardProps {
   title: string;
   value: number;
   icon?: React.ReactNode;
-  color?: 'default' | 'success' | 'warning' | 'error';
+  color?: "default" | "success" | "warning" | "error";
   trend?: {
     value: number;
     isPositive: boolean;
@@ -237,15 +239,15 @@ export interface UploadConfig {
 export const DEFAULT_UPLOAD_CONFIG: UploadConfig = {
   maxFileSize: 10, // 10MB
   allowedTypes: [
-    'application/vnd.ms-excel.sheet.macroEnabled.12', // .xlsm UNIQUEMENT
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // Fallback pour .xlsm
+    "application/vnd.ms-excel.sheet.macroEnabled.12", // .xlsm UNIQUEMENT
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // Fallback pour .xlsm
   ],
-  allowedExtensions: ['.xlsm'], // ✅ UNIQUEMENT .xlsm
+  allowedExtensions: [".xlsm"], // ✅ UNIQUEMENT .xlsm
   validationRules: {
     requireCelSelection: true,
     validateFileName: true,
-    minFileNameLength: 3
-  }
+    minFileNameLength: 3,
+  },
 };
 
 // Types pour les hooks personnalisés
@@ -305,28 +307,28 @@ export interface UploadFormData {
 
 // Types pour les détails de CEL (selon API /api/v1/legislatives/upload/cel/:codeCellule/data)
 export interface CelData {
-  id: number;                       // ID du bureau de vote
-  codeCellule: string;              // Code CEL
-  ordre: number;                    // Ordre d'affichage (1, 2, 3...)
-  referenceLieuVote: string;        // Référence LV (12 chiffres)
-  libelleLieuVote: string;          // Libellé du lieu de vote
-  numeroBureauVote: string;          // Numéro du bureau (ex: "01")
+  id: number; // ID du bureau de vote
+  codeCellule: string; // Code CEL
+  ordre: number; // Ordre d'affichage (1, 2, 3...)
+  referenceLieuVote: string; // Référence LV (12 chiffres)
+  libelleLieuVote: string; // Libellé du lieu de vote
+  numeroBureauVote: string; // Numéro du bureau (ex: "01")
 
   // Données démographiques
-  populationHommes: number;         // Population hommes
-  populationFemmes: number;         // Population femmes
-  populationTotale: number;         // Population totale
+  populationHommes: number; // Population hommes
+  populationFemmes: number; // Population femmes
+  populationTotale: number; // Population totale
 
   // Données de vote
-  votantsHommes: number;            // Votants hommes
-  votantsFemmes: number;            // Votants femmes
-  totalVotants: number;             // Total votants
-  tauxParticipation: number;         // Taux de participation (%)
+  votantsHommes: number; // Votants hommes
+  votantsFemmes: number; // Votants femmes
+  totalVotants: number; // Total votants
+  tauxParticipation: number; // Taux de participation (%)
 
   // Bulletins
-  bulletinsNuls: number;             // Bulletins nuls
-  suffrageExprime: number;          // Suffrage exprimé
-  bulletinsBlancs: number;           // Bulletins blancs
+  bulletinsNuls: number; // Bulletins nuls
+  suffrageExprime: number; // Suffrage exprimé
+  bulletinsBlancs: number; // Bulletins blancs
 
   // Statut
   statutSuppressionBv: string | null; // Statut suppression BV ("OK" | "NOK" | null)
@@ -339,27 +341,43 @@ export interface CelData {
 
 export interface CelMetrics {
   inscrits: {
-    total: number;      // Total des inscrits
-    hommes: number;     // Inscrits hommes
-    femmes: number;     // Inscrits femmes
+    total: number; // Total des inscrits
+    hommes: number; // Inscrits hommes
+    femmes: number; // Inscrits femmes
   };
   votants: {
-    total: number;      // Total des votants
-    hommes: number;    // Votants hommes
-    femmes: number;     // Votants femmes
+    total: number; // Total des votants
+    hommes: number; // Votants hommes
+    femmes: number; // Votants femmes
   };
-  tauxParticipation: number;    // Taux de participation global (%)
-  suffrageExprime: number;       // Total suffrage exprimé
-  bulletinsBlancs: number;       // Total bulletins blancs
-  bulletinsNuls: number;         // Total bulletins nuls
+  tauxParticipation: number; // Taux de participation global (%)
+  suffrageExprime: number; // Total suffrage exprimé
+  bulletinsBlancs: number; // Total bulletins blancs
+  bulletinsNuls: number; // Total bulletins nuls
 }
 
 export interface CelDataResponse {
-  codeCellule: string;              // Code CEL (ex: "S003")
-  libelleCellule: string;           // Libellé CEL (ex: "CESP CECHI")
-  codeCirconscription: string;      // Code circonscription (ex: "004")
-  libelleCirconscription: string | null;  // Libellé circonscription
-  totalBureaux: number;             // Nombre total de bureaux de vote
-  data: CelData[];                  // Tableau des bureaux de vote
-  metrics: CelMetrics;              // Métriques agrégées
+  codeCellule: string; // Code CEL (ex: "S003")
+  libelleCellule: string; // Libellé CEL (ex: "CESP CECHI")
+  codeCirconscription: string; // Code circonscription (ex: "004")
+  libelleCirconscription: string | null; // Libellé circonscription
+  totalBureaux: number; // Nombre total de bureaux de vote
+  data: CelData[]; // Tableau des bureaux de vote
+  metrics: CelMetrics; // Métriques agrégées
+}
+
+// Types pour les circonscriptions prêtes à être publiées
+// (selon API /api/v1/legislatives/upload/ready-to-publish)
+export interface ReadyToPublishCirconscription {
+  codeCirconscription: string;
+  libelleCirconscription: string | null;
+  totalCels: number;
+  importedCels: number;
+  pendingCels: number;
+  lastImportDate: string | null; // ISO 8601 format (UTC)
+}
+
+export interface ReadyToPublishCirconscriptionsResponse {
+  circonscriptions: ReadyToPublishCirconscription[];
+  total: number;
 }
