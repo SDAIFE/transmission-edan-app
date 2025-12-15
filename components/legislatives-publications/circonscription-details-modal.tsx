@@ -434,15 +434,69 @@ export function CirconscriptionDetailsModal({
       },
     ];
 
+    // Déterminer le vainqueur global depuis les scores totaux des candidats
+    const getGlobalWinner = (): {
+      winners: string[];
+      isTie: boolean;
+      singleWinner: string | null;
+    } => {
+      if (!data?.candidats || data.candidats.length === 0) {
+        return { winners: [], isTie: false, singleWinner: null };
+      }
+
+      // Récupérer tous les scores des candidats
+      const scores = data.candidats
+        .filter((c) => (c.score || 0) > 0)
+        .map((c) => ({ numDos: c.numeroDossier, score: c.score || 0 }));
+
+      if (scores.length === 0) {
+        return { winners: [], isTie: false, singleWinner: null };
+      }
+
+      const maxScore = Math.max(...scores.map((s) => s.score));
+      const winners = scores
+        .filter((s) => s.score === maxScore)
+        .map((s) => s.numDos);
+
+      const isTie = winners.length > 1;
+      const singleWinner = winners.length === 1 ? winners[0] : null;
+
+      return {
+        winners,
+        isTie,
+        singleWinner,
+      };
+    };
+
+    const globalWinner = getGlobalWinner();
+
     // Colonnes dynamiques pour les candidats
     const candidateCols = candidateColumns.map((numDos) => {
       // Trouver le nom du candidat depuis les données globales
       const candidat = data?.candidats?.find((c) => c.numeroDossier === numDos);
       const candidatName = candidat?.nom || numDos;
 
+      // Vérifier si ce candidat est le vainqueur global
+      const isGlobalWinner = globalWinner.singleWinner === numDos;
+      const isInGlobalTie =
+        globalWinner.isTie && globalWinner.winners.includes(numDos);
+
       return {
         title: (
-          <div className="text-center">
+          <div className="text-center flex flex-col items-center gap-1">
+            {/* Badge de victoire/égalité au-dessus du nom */}
+            {(isGlobalWinner || isInGlobalTie) && (
+              <Badge
+                variant={isInGlobalTie ? "outline" : "default"}
+                className={`text-xs ${
+                  isInGlobalTie
+                    ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                    : "bg-green-100 text-green-800 border-green-300"
+                }`}
+              >
+                {isInGlobalTie ? "Égalité" : "Victoire"}
+              </Badge>
+            )}
             <div className="font-bold text-xs">{candidatName}</div>
           </div>
         ),
@@ -451,41 +505,14 @@ export function CirconscriptionDetailsModal({
         width: 100,
         align: "center" as const,
         render: (value: number, record: CelTableRow) => {
-          const { winners, isTie, singleWinner } = getWinners(record);
-
-          // Afficher "Victoire" uniquement s'il y a un seul vainqueur
-          // Afficher "Égalité" s'il y a plusieurs candidats avec le même score maximum
-          const isSingleWinner = singleWinner === numDos;
-          const isInTie = isTie && winners.includes(numDos);
-
           return (
             <div
-              className={`text-sm font-medium flex flex-col items-center gap-1 ${
+              className={`text-sm font-medium ${
                 record.isTotal ? "font-bold text-white bg-green-500" : ""
               }`}
               data-index={`candidate-${numDos}`}
             >
-              <div>{value > 0 ? formatNumber(value) : "0"}</div>
-              {value > 0 && !record.isTotal && (
-                <>
-                  {isSingleWinner && (
-                    <Badge
-                      variant="default"
-                      className="text-xs bg-green-100 text-green-800 border-green-300"
-                    >
-                      Victoire
-                    </Badge>
-                  )}
-                  {isInTie && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs bg-yellow-100 text-yellow-800 border-yellow-300"
-                    >
-                      Égalité
-                    </Badge>
-                  )}
-                </>
-              )}
+              {value > 0 ? formatNumber(value) : "0"}
             </div>
           );
         },
