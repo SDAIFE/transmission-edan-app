@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,29 +18,35 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  MoreHorizontal, 
-  Eye, 
-  CheckCircle, 
+} from "@/components/ui/dropdown-menu";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  MoreHorizontal,
+  Eye,
+  CheckCircle,
   XCircle,
   RefreshCw,
   Building2,
   Calendar,
   Hash,
-  MapPin
-} from 'lucide-react';
-import type { 
-  EntitiesTableProps, 
-  PublishableEntity, 
-  PublicationStatus, 
-  EntityType 
-} from '@/types/publications';
+  MapPin,
+} from "lucide-react";
+import type {
+  EntitiesTableProps,
+  PublishableEntity,
+  PublicationStatus,
+  EntityType,
+} from "@/types/publications";
 
-export function EntitiesTable({ 
-  entities = [], 
-  loading = false, 
+export function EntitiesTable({
+  entities = [],
+  loading = false,
   onRefresh,
   onPublish,
   onCancel,
@@ -50,54 +56,54 @@ export function EntitiesTable({
   onPageChange,
   filters,
   onFiltersChange,
-  isUser = false
+  isUser = false,
 }: EntitiesTableProps) {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
-  
+
   // Protection contre undefined
   const safeEntities = entities || [];
 
   // Adaptation des termes selon le rôle
-  const publishAction = isUser ? 'Consolider' : 'Publier';
-  const publishActionLower = isUser ? 'consolider' : 'publier';
-  const publishActionPast = isUser ? 'consolidé' : 'publié';
-  const publishActionPastFeminine = isUser ? 'consolidée' : 'publiée';
-  const publishActionGerund = isUser ? 'consolidation' : 'publication';
+  const publishAction = isUser ? "Consolider" : "Publier";
+  const publishActionLower = isUser ? "consolider" : "publier";
+  const publishActionPast = isUser ? "consolidé" : "publié";
+  const publishActionPastFeminine = isUser ? "consolidée" : "publiée";
+  const publishActionGerund = isUser ? "consolidation" : "publication";
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Date inconnue';
-    
+    if (!dateString) return "Date inconnue";
+
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return 'Date invalide';
+      return "Date invalide";
     }
-    
-    return date.toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+
+    return date.toLocaleString("fr-FR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getStatusBadge = (status: PublicationStatus) => {
     switch (status) {
-      case 'PUBLISHED':
+      case "PUBLISHED":
         return (
           <Badge className="bg-green-100 text-green-800 border-green-200">
             <CheckCircle className="h-3 w-3 mr-1" />
             {publishActionPastFeminine}
           </Badge>
         );
-      case 'CANCELLED':
+      case "CANCELLED":
         return (
           <Badge className="bg-red-100 text-red-800 border-red-200">
             <XCircle className="h-3 w-3 mr-1" />
             Annulée
           </Badge>
         );
-      case 'PENDING':
+      case "PENDING":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
             <RefreshCw className="h-3 w-3 mr-1" />
@@ -105,27 +111,48 @@ export function EntitiesTable({
           </Badge>
         );
       default:
-        return (
-          <Badge variant="outline">
-            Inconnu
-          </Badge>
-        );
+        return <Badge variant="outline">Inconnu</Badge>;
     }
   };
 
   // Icône selon le type d'entité
   const getEntityIcon = (type: EntityType) => {
-    return type === 'DEPARTMENT' 
-      ? <Building2 className="h-4 w-4 text-blue-600" />
-      : <MapPin className="h-4 w-4 text-indigo-600" />;
+    return type === "DEPARTMENT" ? (
+      <Building2 className="h-4 w-4 text-blue-600" />
+    ) : (
+      <MapPin className="h-4 w-4 text-indigo-600" />
+    );
   };
 
-  // Couleur de fond selon le type d'entité
+  // Couleur de fond selon l'état de l'entité
   const getEntityRowClass = (entity: PublishableEntity) => {
+    // Priorité à la sélection
     if (selectedEntity === entity.id) {
-      return 'bg-muted/50';
+      return "bg-muted/50";
     }
-    return entity.type === 'COMMUNE' ? 'bg-blue-50/30 hover:bg-blue-50/50' : '';
+
+    // Orange atténué avec animation : Prête à publier (toutes CELs importées mais pas encore publiée)
+    const isReadyToPublish =
+      entity.totalCels === entity.importedCels &&
+      entity.publicationStatus !== "PUBLISHED" &&
+      entity.publicationStatus !== "CANCELLED";
+
+    if (isReadyToPublish) {
+      return "bg-orange-50/60 hover:bg-orange-50/80 animate-pulse-subtle transition-colors";
+    }
+
+    // Vert atténué : Publiée
+    if (entity.publicationStatus === "PUBLISHED") {
+      return "bg-green-50/50 hover:bg-green-50/70 transition-colors";
+    }
+
+    // Rouge atténué : Annulée
+    if (entity.publicationStatus === "CANCELLED") {
+      return "bg-red-50/50 hover:bg-red-50/70 transition-colors";
+    }
+
+    // Par défaut, garder le comportement pour les communes
+    return entity.type === "COMMUNE" ? "bg-blue-50/30 hover:bg-blue-50/50" : "";
   };
 
   const handleAction = (action: () => void, entityId: string) => {
@@ -140,12 +167,17 @@ export function EntitiesTable({
       <Card>
         <CardHeader>
           <CardTitle>Entités publiables</CardTitle>
-          <CardDescription>Chargement des départements et communes&hellip;</CardDescription>
+          <CardDescription>
+            Chargement des départements et communes&hellip;
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center space-x-4 p-4 border rounded">
+              <div
+                key={index}
+                className="flex items-center space-x-4 p-4 border rounded"
+              >
                 <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
                 <div className="space-y-2 flex-1">
                   <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
@@ -170,7 +202,8 @@ export function EntitiesTable({
               Entités publiables
             </CardTitle>
             <CardDescription>
-              {safeEntities.length} entité{safeEntities.length > 1 ? 's' : ''} au total
+              {safeEntities.length} entité{safeEntities.length > 1 ? "s" : ""}{" "}
+              au total
               {totalPages > 1 && ` - Page ${currentPage} sur ${totalPages}`}
             </CardDescription>
           </div>
@@ -206,10 +239,7 @@ export function EntitiesTable({
             </TableHeader>
             <TableBody>
               {safeEntities.map((entity) => (
-                <TableRow 
-                  key={entity.id}
-                  className={getEntityRowClass(entity)}
-                >
+                <TableRow key={entity.id} className={getEntityRowClass(entity)}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getEntityIcon(entity.type)}
@@ -219,8 +249,11 @@ export function EntitiesTable({
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{entity.code}</span>
-                          {entity.type === 'COMMUNE' && (
-                            <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                          {entity.type === "COMMUNE" && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200"
+                            >
                               Commune
                             </Badge>
                           )}
@@ -228,25 +261,37 @@ export function EntitiesTable({
                       </div>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
                       <Hash className="h-3 w-3 text-muted-foreground" />
                       <span>{entity.totalCels}</span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm text-green-600">
                       <CheckCircle className="h-3 w-3" />
                       <span>{entity.importedCels}</span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
-                      <RefreshCw className={`h-3 w-3 ${entity.pendingCels > 0 ? 'text-yellow-600' : 'text-green-600'}`} />
-                      <span className={entity.pendingCels > 0 ? 'text-yellow-600' : 'text-green-600'}>
+                      <RefreshCw
+                        className={`h-3 w-3 ${
+                          entity.pendingCels > 0
+                            ? "text-yellow-600"
+                            : "text-green-600"
+                        }`}
+                      />
+                      <span
+                        className={
+                          entity.pendingCels > 0
+                            ? "text-yellow-600"
+                            : "text-green-600"
+                        }
+                      >
                         {entity.pendingCels}
                       </span>
                       {entity.pendingCels === 0 && (
@@ -254,25 +299,31 @@ export function EntitiesTable({
                       )}
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getStatusBadge(entity.publicationStatus)}
-                      {entity.publicationStatus !== 'PUBLISHED' && entity.pendingCels > 0 && (
-                        <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">
-                          {entity.pendingCels} CEL(s) en attente
-                        </Badge>
-                      )}
+                      {entity.publicationStatus !== "PUBLISHED" &&
+                        entity.pendingCels > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-orange-600 border-orange-200"
+                          >
+                            {entity.pendingCels} CEL(s) en attente
+                          </Badge>
+                        )}
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span className="text-xs">{formatDate(entity.lastUpdate)}</span>
+                      <span className="text-xs">
+                        {formatDate(entity.lastUpdate)}
+                      </span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -283,11 +334,14 @@ export function EntitiesTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem 
+
+                        <DropdownMenuItem
                           onClick={() => {
-                            if (process.env.NODE_ENV === 'development') {
-                              console.log('👁️ [EntitiesTable] Voir détails:', entity);
+                            if (process.env.NODE_ENV === "development") {
+                              console.log(
+                                "👁️ [EntitiesTable] Voir détails:",
+                                entity
+                              );
                             }
                             if (onViewDetails) {
                               onViewDetails(entity);
@@ -297,28 +351,34 @@ export function EntitiesTable({
                           <Eye className="mr-2 h-4 w-4" />
                           Voir les détails
                         </DropdownMenuItem>
-                        
+
                         {/* Bouton Publier - désactivé si CELs en attente */}
-                        {entity.publicationStatus !== 'PUBLISHED' && onPublish && (
-                          <DropdownMenuItem 
-                            onClick={() => handleAction(() => onPublish(entity), entity.id)}
-                            disabled={entity.pendingCels > 0}
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            {publishAction}
-                            {entity.pendingCels > 0 && ' (CELs en attente)'}
-                          </DropdownMenuItem>
-                        )}
-                        
+                        {entity.publicationStatus !== "PUBLISHED" &&
+                          onPublish && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleAction(() => onPublish(entity), entity.id)
+                              }
+                              disabled={entity.pendingCels > 0}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              {publishAction}
+                              {entity.pendingCels > 0 && " (CELs en attente)"}
+                            </DropdownMenuItem>
+                          )}
+
                         {/* Bouton Annuler - seulement si publié */}
-                        {entity.publicationStatus === 'PUBLISHED' && onCancel && (
-                          <DropdownMenuItem 
-                            onClick={() => handleAction(() => onCancel(entity), entity.id)}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Annuler la {publishActionGerund}
-                          </DropdownMenuItem>
-                        )}
+                        {entity.publicationStatus === "PUBLISHED" &&
+                          onCancel && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleAction(() => onCancel(entity), entity.id)
+                              }
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Annuler la {publishActionGerund}
+                            </DropdownMenuItem>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -356,4 +416,3 @@ export function EntitiesTable({
     </Card>
   );
 }
-

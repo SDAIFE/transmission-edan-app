@@ -192,3 +192,17 @@
 .animate-scroll {
   animation: scroll 20s linear infinite;
 }
+
+/* Animation subtile pour les lignes prêtes à publier */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
