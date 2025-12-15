@@ -47,17 +47,12 @@ export function ImportsTable({
   onViewDetails,
   onDownload,
   onDelete,
-  // ✅ NOUVEAU : Props de pagination
+  // Props de pagination
   total,
   currentPage = 1,
   totalPages = 1,
   onPageChange,
-}: ImportsTableProps & {
-  total?: number;
-  currentPage?: number;
-  totalPages?: number;
-  onPageChange?: (page: number) => void;
-}) {
+}: ImportsTableProps) {
   const [selectedImport, setSelectedImport] = useState<string | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedImportData, setSelectedImportData] =
@@ -141,8 +136,17 @@ export function ImportsTable({
               Imports
             </CardTitle>
             <CardDescription>
-              {imports.length} feuille{imports.length > 1 ? "s" : ""} Excel au
-              total
+              {total !== undefined ? (
+                <>
+                  {imports.length} sur {total} import{total > 1 ? "s" : ""}
+                  {totalPages > 1 && ` • Page ${currentPage} sur ${totalPages}`}
+                </>
+              ) : (
+                <>
+                  {imports.length} feuille{imports.length > 1 ? "s" : ""} Excel
+                  au total
+                </>
+              )}
             </CardDescription>
           </div>
           {onRefresh && (
@@ -333,9 +337,9 @@ export function ImportsTable({
         importData={selectedImportData}
       />
 
-      {/* ✅ NOUVEAU : Contrôles de pagination */}
+      {/* Contrôles de pagination */}
       {total !== undefined && totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-4 border-t">
+        <div className="flex items-center justify-between px-6 py-4 border-t">
           <div className="text-sm text-muted-foreground">
             Affichage de <span className="font-medium">{imports.length}</span>{" "}
             sur <span className="font-medium">{total}</span> import

@@ -196,6 +196,11 @@ export interface ImportsTableProps {
   onViewDetails?: (importData: ImportData) => void;
   onDownload?: (importData: ImportData) => void;
   onDelete?: (importData: ImportData) => void;
+  // Props de pagination
+  total?: number;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 // Props pour les filtres d'imports
@@ -296,6 +301,11 @@ export interface ImportsTableProps {
   onViewDetails?: (importData: ImportData) => void;
   onDownload?: (importData: ImportData) => void;
   onDelete?: (importData: ImportData) => void;
+  // Props de pagination
+  total?: number;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export interface UploadFormData {
