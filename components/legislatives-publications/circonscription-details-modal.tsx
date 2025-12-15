@@ -298,6 +298,39 @@ export function CirconscriptionDetailsModal({
 
   // Colonnes du tableau des CELs
   const celsColumns: TableColumnsType<CelTableRow> = useMemo(() => {
+    // Fonction helper pour déterminer les gagnants/égalités dans une ligne
+    // Retourne un seul vainqueur uniquement s'il n'y a pas d'égalité
+    const getWinners = (
+      record: CelTableRow
+    ): { winners: string[]; isTie: boolean; singleWinner: string | null } => {
+      const scores: { numDos: string; score: number }[] = [];
+
+      candidateColumns.forEach((numDos) => {
+        const score = record[`candidate_${numDos}`] || 0;
+        if (score > 0) {
+          scores.push({ numDos, score });
+        }
+      });
+
+      if (scores.length === 0) {
+        return { winners: [], isTie: false, singleWinner: null };
+      }
+
+      const maxScore = Math.max(...scores.map((s) => s.score));
+      const winners = scores
+        .filter((s) => s.score === maxScore)
+        .map((s) => s.numDos);
+
+      // Il n'y a qu'un seul vainqueur si winners.length === 1
+      const isTie = winners.length > 1;
+      const singleWinner = winners.length === 1 ? winners[0] : null;
+
+      return {
+        winners,
+        isTie,
+        singleWinner,
+      };
+    };
     const baseColumns: TableColumnsType<CelTableRow> = [
       {
         title: "Code CEL",
@@ -411,30 +444,58 @@ export function CirconscriptionDetailsModal({
         title: (
           <div className="text-center">
             <div className="font-bold text-xs">{candidatName}</div>
-            <div className="text-xs text-muted-foreground">{numDos}</div>
           </div>
         ),
         dataIndex: `candidate_${numDos}`,
         key: `candidate_${numDos}`,
         width: 100,
         align: "center" as const,
-        render: (value: number, record: CelTableRow) => (
-          <div
-            className={`text-sm font-medium ${
-              record.isTotal ? "font-bold text-white bg-green-500" : ""
-            }`}
-            data-index={`candidate-${numDos}`}
-          >
-            {value > 0 ? formatNumber(value) : "0"}
-          </div>
-        ),
+        render: (value: number, record: CelTableRow) => {
+          const { winners, isTie, singleWinner } = getWinners(record);
+
+          // Afficher "Victoire" uniquement s'il y a un seul vainqueur
+          // Afficher "Égalité" s'il y a plusieurs candidats avec le même score maximum
+          const isSingleWinner = singleWinner === numDos;
+          const isInTie = isTie && winners.includes(numDos);
+
+          return (
+            <div
+              className={`text-sm font-medium flex flex-col items-center gap-1 ${
+                record.isTotal ? "font-bold text-white bg-green-500" : ""
+              }`}
+              data-index={`candidate-${numDos}`}
+            >
+              <div>{value > 0 ? formatNumber(value) : "0"}</div>
+              {value > 0 && !record.isTotal && (
+                <>
+                  {isSingleWinner && (
+                    <Badge
+                      variant="default"
+                      className="text-xs bg-green-100 text-green-800 border-green-300"
+                    >
+                      Victoire
+                    </Badge>
+                  )}
+                  {isInTie && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-yellow-100 text-yellow-800 border-yellow-300"
+                    >
+                      Égalité
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        },
       };
     });
 
     return [...baseColumns, ...candidateCols];
   }, [candidateColumns, data]);
 
-  // Filtrer les CELs selon la recherche
+  // Filtrer les CELs selon la recherche (exclure la ligne "RÉSULTATS AGRÉGÉS")
   const filteredCels = useMemo(() => {
     if (!searchText.trim()) return celsTableData;
 
@@ -445,6 +506,11 @@ export function CirconscriptionDetailsModal({
         cel.libelleCel?.toLowerCase().includes(searchLower)
     );
   }, [celsTableData, searchText]);
+
+  // Compter uniquement les CELs (exclure la ligne "RÉSULTATS AGRÉGÉS" du comptage)
+  const celsCount = useMemo(() => {
+    return filteredCels.filter((cel) => !cel.isTotal).length;
+  }, [filteredCels]);
 
   // Gestion des actions
   const handlePublishClick = () => setShowPublishAlert(true);
@@ -610,8 +676,8 @@ export function CirconscriptionDetailsModal({
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Building2 className="h-5 w-5" />
-                      Données par CEL ({filteredCels.length} CEL
-                      {filteredCels.length > 1 ? "s" : ""})
+                      Données par CEL ({celsCount} CEL
+                      {celsCount > 1 ? "s" : ""})
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       <div className="relative">
