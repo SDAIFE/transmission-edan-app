@@ -18,7 +18,7 @@ export interface LegislativePublicationStats {
 // CIRCONSCRIPTION
 // ============================================================================
 
-export type PublicationStatus = '0' | '1' | 'C'; // '0' = Non publié, '1' = Publié, 'C' = Annulé
+export type PublicationStatus = "0" | "1" | "C"; // '0' = Non publié, '1' = Publié, 'C' = Annulé
 
 export interface CirconscriptionCel {
   codeCel: string;
@@ -48,6 +48,7 @@ export interface CirconscriptionQuery {
   limit?: number;
   statPub?: PublicationStatus; // '0' | '1' | 'C'
   search?: string; // Recherche par code ou libellé
+  readyToPublish?: boolean; // Filtre pour les circonscriptions prêtes à être publiées
 }
 
 // ============================================================================
@@ -212,4 +213,3 @@ export interface LegislativeStatsSectionProps {
   stats: LegislativePublicationStats | null;
   loading?: boolean;
 }
-

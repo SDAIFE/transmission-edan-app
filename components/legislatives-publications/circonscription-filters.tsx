@@ -14,16 +14,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Filter, X, Search } from "lucide-react";
-import type { CirconscriptionFiltersProps, PublicationStatus } from "@/types/legislatives-publications";
+import type {
+  CirconscriptionFiltersProps,
+  PublicationStatus,
+} from "@/types/legislatives-publications";
 
 export function CirconscriptionFilters({
   filters,
   onFiltersChange,
   loading = false,
 }: CirconscriptionFiltersProps) {
-  const [selectedStatus, setSelectedStatus] = useState<PublicationStatus | "all">(
-    filters.statPub || "all"
-  );
+  const [selectedStatus, setSelectedStatus] = useState<
+    PublicationStatus | "all" | "ready"
+  >(filters.readyToPublish ? "ready" : filters.statPub || "all");
   const [searchText, setSearchText] = useState(filters.search || "");
 
   // Ref pour éviter les appels répétés
@@ -47,13 +50,19 @@ export function CirconscriptionFilters({
         page: 1, // Reset à la première page lors du filtrage
         limit: filters.limit || 10,
         statPub:
-          selectedStatus === "all" ? undefined : (selectedStatus as PublicationStatus),
+          selectedStatus === "all" || selectedStatus === "ready"
+            ? undefined
+            : (selectedStatus as PublicationStatus),
+        readyToPublish: selectedStatus === "ready" ? true : undefined,
         search: searchText.trim() || undefined,
       };
 
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
-        console.log("🔍 [CirconscriptionFilters] Application des filtres:", newFilters);
+        console.log(
+          "🔍 [CirconscriptionFilters] Application des filtres:",
+          newFilters
+        );
       }
 
       onFiltersChangeRef.current?.(newFilters);
@@ -89,7 +98,7 @@ export function CirconscriptionFilters({
             <Select
               value={selectedStatus}
               onValueChange={(value) =>
-                setSelectedStatus(value as PublicationStatus | "all")
+                setSelectedStatus(value as PublicationStatus | "all" | "ready")
               }
               disabled={loading}
             >
@@ -98,6 +107,7 @@ export function CirconscriptionFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="ready">En attente de publication</SelectItem>
                 <SelectItem value="0">Non publié</SelectItem>
                 <SelectItem value="1">Publié</SelectItem>
                 <SelectItem value="C">Annulé</SelectItem>
@@ -127,11 +137,15 @@ export function CirconscriptionFilters({
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-sm text-muted-foreground">Filtres actifs:</span>
+                <span className="text-sm text-muted-foreground">
+                  Filtres actifs:
+                </span>
                 {selectedStatus !== "all" && (
                   <Badge variant="secondary" className="text-xs">
                     Statut:{" "}
-                    {selectedStatus === "0"
+                    {selectedStatus === "ready"
+                      ? "En attente de publication"
+                      : selectedStatus === "0"
                       ? "Non publié"
                       : selectedStatus === "1"
                       ? "Publié"
@@ -166,4 +180,3 @@ export function CirconscriptionFilters({
     </Card>
   );
 }
-

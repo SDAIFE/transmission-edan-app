@@ -11,15 +11,19 @@ import { CirconscriptionsTable } from "./circonscriptions-table";
 import { CirconscriptionFilters } from "./circonscription-filters";
 import { CirconscriptionDetailsModal } from "./circonscription-details-modal";
 import { NationalDataModal } from "./national-data-modal";
+import { ReadyToPublishCirconscriptionsAlert } from "@/components/upload/ready-to-publish-circonscriptions-alert";
 
 // API et types
 import { legislativesPublicationsApi } from "@/lib/api/legislatives-publications";
+import { uploadApi } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type {
   Circonscription,
   LegislativePublicationStats,
   CirconscriptionQuery,
   LegislativesPublicationsPageContentProps,
 } from "@/types/legislatives-publications";
+import type { ReadyToPublishCirconscription } from "@/types/upload";
 
 export function LegislativesPublicationsPageContent({
   onPublicationSuccess,
@@ -46,6 +50,12 @@ export function LegislativesPublicationsPageContent({
     page: 1,
     limit: 10,
   });
+  // ✅ NOUVEAU : État pour les circonscriptions prêtes à publier
+  const [readyToPublishCirconscriptions, setReadyToPublishCirconscriptions] =
+    useState<ReadyToPublishCirconscription[]>([]);
+
+  // Récupérer l'utilisateur connecté pour déterminer le rôle
+  const { user } = useAuth();
 
   // États pour la modal de détails
   const [selectedCodeCirconscription, setSelectedCodeCirconscription] =
@@ -66,11 +76,23 @@ export function LegislativesPublicationsPageContent({
         setInternalLoading(true);
         const filtersToUse = customFilters || filtersRef.current;
 
-        // Charger les statistiques et circonscriptions en parallèle
-        const [statsData, circonscriptionsData] = await Promise.allSettled([
-          legislativesPublicationsApi.getStats(),
-          legislativesPublicationsApi.getCirconscriptions(filtersToUse),
-        ]);
+        // Si on filtre par "readyToPublish", charger toutes les circonscriptions (sans pagination)
+        // car le filtrage se fait côté client
+        const queryForApi = filtersToUse.readyToPublish
+          ? {
+              ...filtersToUse,
+              page: 1,
+              limit: 1000, // Charger un grand nombre pour avoir toutes les circonscriptions
+            }
+          : filtersToUse;
+
+        // Charger les statistiques, circonscriptions et circonscriptions prêtes à publier en parallèle
+        const [statsData, circonscriptionsData, readyToPublishData] =
+          await Promise.allSettled([
+            legislativesPublicationsApi.getStats(),
+            legislativesPublicationsApi.getCirconscriptions(queryForApi),
+            uploadApi.getReadyToPublishCirconscriptions(),
+          ]);
 
         // Traiter les statistiques
         if (statsData.status === "fulfilled") {
@@ -89,19 +111,48 @@ export function LegislativesPublicationsPageContent({
           circonscriptionsData.status === "fulfilled" &&
           circonscriptionsData.value
         ) {
+          let filteredCirconscriptions =
+            circonscriptionsData.value.circonscriptions;
+          let filteredTotal = circonscriptionsData.value.total;
+          let filteredTotalPages = circonscriptionsData.value.totalPages;
+
+          // Filtrer côté client pour "En attente de publication"
+          if (filtersToUse.readyToPublish) {
+            filteredCirconscriptions = filteredCirconscriptions.filter(
+              (circ) =>
+                circ.importedCels === circ.totalCels &&
+                circ.totalCels > 0 &&
+                circ.publicationStatus !== "1" &&
+                circ.publicationStatus !== "C"
+            );
+            // Recalculer la pagination pour le filtre
+            const limit = filtersToUse.limit || 10;
+            filteredTotal = filteredCirconscriptions.length;
+            filteredTotalPages = Math.ceil(filteredTotal / limit);
+
+            // Appliquer la pagination côté client
+            const startIndex = ((filtersToUse.page || 1) - 1) * limit;
+            const endIndex = startIndex + limit;
+            filteredCirconscriptions = filteredCirconscriptions.slice(
+              startIndex,
+              endIndex
+            );
+          }
+
           if (process.env.NODE_ENV === "development") {
             // eslint-disable-next-line no-console
             console.log(
               "🔍 [LegislativesPublicationsPageContent] Circonscriptions reçues:",
               {
-                total: circonscriptionsData.value.total,
-                count: circonscriptionsData.value.circonscriptions.length,
+                total: filteredTotal,
+                count: filteredCirconscriptions.length,
                 page: circonscriptionsData.value.page,
+                readyToPublish: filtersToUse.readyToPublish,
               }
             );
           }
-          setCirconscriptions(circonscriptionsData.value.circonscriptions);
-          setTotalPages(circonscriptionsData.value.totalPages);
+          setCirconscriptions(filteredCirconscriptions);
+          setTotalPages(filteredTotalPages);
           setCurrentPage(circonscriptionsData.value.page);
         } else {
           console.warn(
@@ -110,6 +161,19 @@ export function LegislativesPublicationsPageContent({
           setCirconscriptions([]);
           setTotalPages(1);
           setCurrentPage(1);
+        }
+
+        // ✅ NOUVEAU : Traiter les circonscriptions prêtes à publier
+        if (
+          readyToPublishData.status === "fulfilled" &&
+          readyToPublishData.value
+        ) {
+          setReadyToPublishCirconscriptions(
+            readyToPublishData.value.circonscriptions
+          );
+        } else {
+          // En cas d'erreur ou de permissions insuffisantes, mettre une liste vide
+          setReadyToPublishCirconscriptions([]);
         }
       } catch (error: unknown) {
         console.error(
@@ -299,6 +363,21 @@ export function LegislativesPublicationsPageContent({
     <div className="space-y-6">
       {/* Statistiques */}
       <LegislativeStatsSection stats={stats} loading={loading} />
+
+      {/* ✅ NOUVEAU : Alerte des circonscriptions prêtes à publier */}
+      <ReadyToPublishCirconscriptionsAlert
+        circonscriptions={readyToPublishCirconscriptions}
+        loading={loading}
+        isUser={user?.role?.code === "USER"}
+        onViewDetails={(codeCirconscription) => {
+          // Filtrer les circonscriptions par code quand on clique
+          handleFiltersChange({
+            ...filters,
+            search: codeCirconscription,
+            page: 1,
+          });
+        }}
+      />
 
       {/* Boutons de données nationales (ADMIN/SADMIN uniquement) */}
       {/* {showNationalDataButtons && (

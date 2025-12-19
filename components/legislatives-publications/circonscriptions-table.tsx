@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -58,6 +58,40 @@ export function CirconscriptionsTable({
   // Protection contre undefined
   const safeCirconscriptions = circonscriptions || [];
 
+  // Calculer les statistiques détaillées
+  const stats = useMemo(() => {
+    const published = safeCirconscriptions.filter(
+      (circ) => circ.publicationStatus === "1"
+    ).length;
+
+    const readyToPublish = safeCirconscriptions.filter(
+      (circ) =>
+        circ.importedCels === circ.totalCels &&
+        circ.totalCels > 0 &&
+        circ.publicationStatus !== "1" &&
+        circ.publicationStatus !== "C"
+    ).length;
+
+    const notPublished = safeCirconscriptions.filter(
+      (circ) =>
+        !(
+          circ.importedCels === circ.totalCels &&
+          circ.totalCels > 0 &&
+          circ.publicationStatus !== "1" &&
+          circ.publicationStatus !== "C"
+        ) &&
+        circ.publicationStatus !== "1" &&
+        circ.publicationStatus !== "C"
+    ).length;
+
+    return {
+      published,
+      readyToPublish,
+      notPublished,
+      total: safeCirconscriptions.length,
+    };
+  }, [safeCirconscriptions]);
+
   const formatDate = (dateString: Date | string) => {
     if (!dateString) return "Date inconnue";
 
@@ -104,11 +138,15 @@ export function CirconscriptionsTable({
   };
 
   // Vérifier si une circonscription peut être publiée
+  // Note: Les circonscriptions annulées (statut "C") peuvent être republiées
+  // si toutes leurs CELs sont importées. Lors de l'annulation, le backend
+  // doit mettre ETA_RESULTAT_CEL à "I" (Importé) et non "CANCELLED"
+  // pour permettre la republication.
   const canPublish = (circ: (typeof circonscriptions)[0]) => {
     return (
       circ.importedCels === circ.totalCels &&
       circ.totalCels > 0 &&
-      circ.publicationStatus !== "1"
+      circ.publicationStatus !== "1" // Permet la republication des circonscriptions annulées (statut "C")
     );
   };
 
@@ -195,12 +233,45 @@ export function CirconscriptionsTable({
               <Building2 className="h-5 w-5" />
               Circonscriptions
             </CardTitle>
-            <CardDescription>
-              {safeCirconscriptions.length} circonscription
-              {safeCirconscriptions.length > 1 ? "s" : ""} au total
-              {pagination && pagination.totalPages > 1
-                ? ` - Page ${pagination.page} sur ${pagination.totalPages}`
-                : ""}
+            <CardDescription className="space-y-2">
+              <div>
+                {safeCirconscriptions.length} circonscription
+                {safeCirconscriptions.length > 1 ? "s" : ""} au total
+                {pagination && pagination.totalPages > 1
+                  ? ` - Page ${pagination.page} sur ${pagination.totalPages}`
+                  : ""}
+              </div>
+              {stats.total > 0 && (
+                <div className="flex items-center gap-4 flex-wrap text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    <span className="text-muted-foreground">
+                      Publiées:{" "}
+                      <span className="font-semibold text-green-700">
+                        {stats.published}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
+                    <span className="text-muted-foreground">
+                      En attente:{" "}
+                      <span className="font-semibold text-orange-700">
+                        {stats.readyToPublish}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+                    <span className="text-muted-foreground">
+                      Non publiées:{" "}
+                      <span className="font-semibold text-gray-700">
+                        {stats.notPublished}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardDescription>
           </div>
         </div>

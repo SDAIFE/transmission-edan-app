@@ -740,13 +740,18 @@ export function CirconscriptionDetailsModal({
               {/* Actions (ADMIN/SADMIN uniquement) */}
               {!isUser && (
                 <div className="flex items-center justify-end gap-2">
+                  {/* 
+                    Note: Le bouton "Publier" est disponible pour les circonscriptions annulées (statut "C")
+                    car elles peuvent être republiées. Lors de l'annulation, le backend doit mettre
+                    ETA_RESULTAT_CEL à "I" (Importé) et non "CANCELLED" pour permettre la republication.
+                  */}
                   {onPublish && (
                     <Button
                       onClick={handlePublishClick}
                       className="bg-green-600 hover:bg-green-700"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Publier
+                      {publicationStatus === "C" ? "Republier" : "Publier"}
                     </Button>
                   )}
                   {/* Afficher le bouton "Annuler la publication" uniquement si la circonscription est publiée */}

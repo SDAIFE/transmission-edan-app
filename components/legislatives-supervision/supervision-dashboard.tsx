@@ -74,8 +74,26 @@ export function SupervisionDashboard({
     return `${value.toFixed(2)}%`;
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleString("fr-FR", {
+  const formatDate = (dateString: string | undefined | null): string => {
+    // Vérifier si la date est valide
+    if (!dateString || dateString.trim() === "") {
+      return "Date non disponible";
+    }
+
+    const date = new Date(dateString);
+
+    // Vérifier si la date est valide (pas NaN et pas epoch 0)
+    if (isNaN(date.getTime()) || date.getTime() === 0) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "⚠️ [SupervisionDashboard] Date invalide reçue du backend:",
+          dateString
+        );
+      }
+      return "Date invalide";
+    }
+
+    return date.toLocaleString("fr-FR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -353,7 +371,7 @@ export function SupervisionDashboard({
       dataIndex: "date",
       key: "date",
       width: 180,
-      render: (date: string) => formatDate(date),
+      render: (date: string | undefined | null) => formatDate(date),
     },
     {
       title: "Action",
@@ -673,6 +691,17 @@ export function SupervisionDashboard({
             <CardTitle>Historique Récent</CardTitle>
           </CardHeader>
           <CardContent>
+            {process.env.NODE_ENV === "development" && (
+              <div className="mb-4 text-xs text-muted-foreground">
+                {/* Log des dates reçues pour diagnostic */}
+                {data.historique.slice(0, 3).map((entry, idx) => (
+                  <div key={idx}>
+                    Date brute: {JSON.stringify(entry.date)} →{" "}
+                    {formatDate(entry.date)}
+                  </div>
+                ))}
+              </div>
+            )}
             <Table
               columns={historiqueColumns}
               dataSource={data.historique.slice(0, 10)}
