@@ -51,6 +51,9 @@ interface CelTableRow {
   votants: number;
   participation: number;
   nombreBureaux: number;
+  bulletinsNuls: number; // ⭐ NOUVEAU
+  suffragesExprimes: number; // ⭐ NOUVEAU
+  bulletinsBlancs: number; // ⭐ NOUVEAU
   isTotal: boolean;
   [key: `candidate_${string}`]: number; // Colonnes dynamiques pour les candidats
 }
@@ -261,6 +264,9 @@ export function CirconscriptionDetailsModal({
       votants: data.votants,
       participation: data.participation,
       nombreBureaux: data.nombreBureaux,
+      bulletinsNuls: data.bulletinsNuls ?? 0,
+      suffragesExprimes: data.suffragesExprimes ?? 0,
+      bulletinsBlancs: data.bulletinsBlancs ?? 0,
       isTotal: true, // Flag pour identifier la ligne de totaux
     };
 
@@ -280,6 +286,9 @@ export function CirconscriptionDetailsModal({
         votants: cel.votants,
         participation: cel.participation,
         nombreBureaux: cel.nombreBureaux,
+        bulletinsNuls: cel.bulletinsNuls ?? 0,
+        suffragesExprimes: cel.suffragesExprimes ?? 0,
+        bulletinsBlancs: cel.bulletinsBlancs ?? 0,
         isTotal: false,
       };
 
@@ -415,7 +424,7 @@ export function CirconscriptionDetailsModal({
         ),
       },
       {
-        title: "Participation",
+        title: "Taux de Participation",
         dataIndex: "participation",
         key: "participation",
         width: 100,
@@ -429,6 +438,55 @@ export function CirconscriptionDetailsModal({
             }`}
           >
             {formatPercentage(value)}
+          </div>
+        ),
+      },
+
+      {
+        title: "Bulletins Nuls",
+        dataIndex: "bulletinsNuls",
+        key: "bulletinsNuls",
+        width: 120,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {formatNumber(value)}
+          </div>
+        ),
+      },
+      {
+        title: "Suffrages Exprimés",
+        dataIndex: "suffragesExprimes",
+        key: "suffragesExprimes",
+        width: 120,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {formatNumber(value)}
+          </div>
+        ),
+      },
+      {
+        title: "Bulletins Blancs",
+        dataIndex: "bulletinsBlancs",
+        key: "bulletinsBlancs",
+        width: 120,
+        align: "center",
+        render: (value: number, record: CelTableRow) => (
+          <div
+            className={`text-sm font-medium ${
+              record.isTotal ? "font-bold text-white bg-green-500" : ""
+            }`}
+          >
+            {formatNumber(value)}
           </div>
         ),
       },
@@ -606,7 +664,7 @@ export function CirconscriptionDetailsModal({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
@@ -641,6 +699,34 @@ export function CirconscriptionDetailsModal({
                       </div>
                       <div className="text-2xl font-bold">
                         {formatNumber(data.nombreBureaux)}
+                      </div>
+                    </div>
+                    {/* ⭐ NOUVELLES MÉTRIQUES */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <XCircle className="h-4 w-4" />
+                        <span>Bulletins Nuls</span>
+                      </div>
+                      <div className="text-2xl font-bold text-red-600">
+                        {formatNumber(data.bulletinsNuls ?? 0)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Vote className="h-4 w-4" />
+                        <span>Suffrages Exprimés</span>
+                      </div>
+                      <div className="text-2xl font-bold text-green-700">
+                        {formatNumber(data.suffragesExprimes ?? 0)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileText className="h-4 w-4" />
+                        <span>Bulletins Blancs</span>
+                      </div>
+                      <div className="text-2xl font-bold text-gray-600">
+                        {formatNumber(data.bulletinsBlancs ?? 0)}
                       </div>
                     </div>
                   </div>

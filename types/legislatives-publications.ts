@@ -119,6 +119,10 @@ export interface CelAggregatedData {
   votants: number;
   participation: number; // Pourcentage
   nombreBureaux: number;
+  // ⭐ NOUVEAUX CHAMPS (bulletins)
+  bulletinsNuls: number; // Nombre de bulletins nuls dans la CEL
+  suffragesExprimes: number; // Nombre de suffrages exprimés dans la CEL
+  bulletinsBlancs: number; // Nombre de bulletins blancs dans la CEL
   candidats: CandidateScore[]; // Scores des candidats pour cette CEL
 }
 
@@ -129,6 +133,10 @@ export interface CirconscriptionDataResponse {
   votants: number;
   participation: number; // Pourcentage
   nombreBureaux: number;
+  // ⭐ NOUVEAUX CHAMPS (bulletins)
+  bulletinsNuls: number; // Nombre total de bulletins nuls
+  suffragesExprimes: number; // Nombre total de suffrages exprimés
+  bulletinsBlancs: number; // Nombre total de bulletins blancs
   candidats: CandidateScore[]; // Scores au niveau circonscription
   cels: CelAggregatedData[]; // ⚠️ Données agrégées par CEL (CRUCIAL pour USER)
 }
